@@ -1,0 +1,61 @@
+{
+  "name": "xtractforge",
+  "version": "1.0.0",
+  "description": "Premium cross-platform desktop GUI for yt-dlp",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "build": "vite build",
+    "package:mac": "npm run build && electron-builder --mac",
+    "package:win": "npm run build && electron-builder --win",
+    "package:linux": "npm run build && electron-builder --linux",
+    "package:all": "npm run build && electron-builder --mac --win --linux"
+  },
+  "keywords": [
+    "yt-dlp",
+    "downloader",
+    "gui",
+    "electron",
+    "react",
+    "youtube-dl"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "lucide-react": "^0.454.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^24.13.3",
+    "vite": "^6.0.3"
+  },
+  "build": {
+    "appId": "com.xtractforge.app",
+    "productName": "XtractForge",
+    "directories": {
+      "output": "dist-package"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "zip"]
+    },
+    "linux": {
+      "target": ["AppImage", "deb"]
+    }
+  }
+}
