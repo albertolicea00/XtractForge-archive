@@ -1,17 +1,16 @@
-# 🔨 XtractForge
+# XtractForge
 
 <div align="center">
 
 ![Electron](https://img.shields.io/badge/Electron-33-47848F?logo=electron&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-16+-339933?logo=nodedotjs&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
 
-[![macOS](https://img.shields.io/badge/macOS-Download-000000?logo=apple&logoColor=white&style=for-the-badge)](#-download)
-[![Windows](https://img.shields.io/badge/Windows-Download-0078D4?logo=windows&logoColor=white&style=for-the-badge)](#-download)
-[![Linux](https://img.shields.io/badge/Linux-Download-FCC624?logo=linux&logoColor=black&style=for-the-badge)](#-download)
-
-**[🧩 Plugins & Addons](ADDONS.md) · [🤝 Contributing](CONTRIBUTING.md) · [🐛 Report a Bug](https://github.com/albertolicea00/XtractForge/issues/new?template=bug_report.yml) · [💡 Request a Feature](https://github.com/albertolicea00/XtractForge/issues/new?template=feature_request.yml)**
+**[⏬ Downloads](#️-download) · [🧩 Plugins & Addons](ADDONS.md) · [🤝 Contributing](CONTRIBUTING.md) · [🐛 Report a Bug](https://github.com/albertolicea00/XtractForge/issues/new?template=bug_report.yml) · [💡 Request a Feature](https://github.com/albertolicea00/XtractForge/issues/new?template=feature_request.yml)**
 
 </div>
 
