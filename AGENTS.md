@@ -1,106 +1,212 @@
-# XtractForge - Agent Onboarding & Architecture Documentation
+# XtractForge — Agent & Developer Documentation
 
-This file serves as the technical documentation of the **XtractForge** project for developers and AI agents. It explains the inner workings, data flow, and Inter-Process Communication (IPC) contracts between processes.
-
----
-
-## 🏗️ Application Architecture
-
-XtractForge is built on Electron's two-process architecture:
-
-1. **Main Process (Node.js)**:
-   - Executes `electron/main.js`.
-   - Has full access to Node.js APIs (filesystem, child process spawning).
-   - Manages window lifecycle and configuration storage on disk (`config.json` inside the user data directory).
-   - Spawns child processes to interact with the `yt-dlp` CLI and `ffmpeg` encoder.
-
-2. **Renderer Process (Web/React)**:
-   - Compiled from `src/` via Vite and rendered in Electron's browser window.
-   - Styled using a clean, dark-themed system in `src/index.css`.
-   - Manages the download queue state, URL validation, and user preferences.
-   - **Does not have direct Node.js access for security reasons (contextIsolation: true)**.
-
-3. **Preload Script (Security Bridge - IPC)**:
-   - Executes `electron/preload.js`.
-   - Exposes a secure subset of functions to the frontend via `contextBridge.exposeInMainWorld('api', {...})`.
+Technical reference for the XtractForge codebase. Start here before touching any file.
 
 ---
 
-## 🔌 IPC API (Inter-Process Communication)
+## Application Architecture
 
-The frontend interacts with the operating system by calling methods exposed under `window.api`. The contracts are as follows:
+XtractForge runs on Electron's two-process model:
 
-### Asynchronous Methods (Invocations)
+**Main Process** (`electron/main.js`)
+- Full Node.js access: filesystem, child_process, IPC
+- Owns the plugin registry via `electron/plugin-manager.js`
+- Dispatches URL analysis and downloads to the appropriate plugin
+- Persists settings to `<userData>/config.json`
 
-| Method Name | Arguments | Return Type | Description |
-| :--- | :--- | :--- | :--- |
-| `checkDependencies()` | None | `Promise<Object>` | Returns `{ ytdlp: bool, ffmpeg: bool, ytdlpVersion: string, ffmpegVersion: string }` by running tools with `--version` and `-version`. |
-| `selectFolder()` | None | `Promise<string \| null>` | Opens a native OS folder dialog. Returns the absolute path selected or `null` if cancelled. |
-| `getDefaultDownloadsFolder()` | None | `Promise<string>` | Returns the default downloads folder configured in the application. |
-| `getVideoInfo(url)` | `url: string` | `Promise<Object>` | Runs `yt-dlp --dump-single-json --flat-playlist <url>` and returns the parsed JSON containing metadata and formats. |
-| `startDownload(downloadId, url, options)` | `downloadId: string`, `url: string`, `options: Object` | `Promise<boolean>` | Starts download asynchronously with options like format, destination folder, speed limits, SponsorBlock, and subtitles. |
-| `cancelDownload(downloadId)` | `downloadId: string` | `Promise<boolean>` | Terminates the active download subprocess by sending a `SIGTERM` signal. |
-| `openFolder(path)` | `path: string` | `Promise<boolean>` | Opens the specified path in the OS native file explorer (Finder, Windows Explorer, etc.). |
+**Renderer Process** (`src/`)
+- React + Vite, no direct Node.js access (contextIsolation: true)
+- Communicates exclusively via `window.api` (contextBridge)
 
-### System Events (Listeners)
+**Preload Script** (`electron/preload.js`)
+- Exposes a typed subset of IPC as `window.api`
 
-The frontend can register callbacks to listen to real-time download events:
+---
 
-```javascript
-// Returns an unsubscribe function to prevent memory leaks
-const unsubscribe = window.api.onDownloadProgress((data) => {
-  // data: { downloadId, percent, size, speed, eta, status }
-});
+## Plugin System
+
+### Plugin Interface
+
+Every plugin is a CommonJS module (`module.exports = { ... }`) with these fields:
+
+```js
+{
+  // Identity
+  id: string,          // unique, kebab-case (e.g. 'yt-dlp')
+  name: string,        // display name
+  description: string,
+  type: 'downloader' | 'searcher',
+  icon: string,        // emoji
+  repoUrl: string,     // GitHub or project URL shown in the UI
+  installHint: string, // one-line install command shown when not available
+
+  // Settings schema rendered in Settings → [Plugin] tab
+  configSchema: Array<{
+    key: string,
+    label: string,
+    type: 'text' | 'toggle' | 'select',
+    default: any,
+    placeholder?: string,
+    options?: string[],   // required when type === 'select'
+  }>,
+
+  // Methods (config = merged global + plugin-specific config)
+  checkDependency(config): { available: boolean, version: string },
+  canHandle(url): boolean,              // downloaders only
+  getInfo(url, config): Promise<InfoResult>,
+  buildDownloadArgs(url, options, config): { binary: string, args: string[] },
+  parseProgress(line): ProgressResult | null,
+
+  // Searchers only
+  search(query, config): Promise<{ results: SearchResult[] }>,
+}
+```
+
+**InfoResult shape:**
+```js
+{
+  success: true,
+  data: {
+    title: string,
+    thumbnail: string,
+    thumbnails: Array<{ url: string }>,
+    duration: number,      // seconds
+    uploader: string,
+    channel: string,
+    view_count: number | null,
+    formats: Array<{
+      format_id: string,
+      ext: string,
+      resolution: string,
+      filesize: number | null,
+      filesize_approx: number | null,
+      fps: number | null,
+      format_note: string,
+      vcodec: string,
+    }>,
+    _plugin: string,       // plugin id that handled this
+    _isGallery?: boolean,  // gallery-dl flag
+  }
+}
+```
+
+**SearchResult shape (Ollama):**
+```js
+{ title: string, searchQuery: string, description: string, type: 'video' | 'audio' }
+```
+
+### Plugin Manager (`electron/plugin-manager.js`)
+
+| Export | Description |
+|---|---|
+| `getDownloaderForUrl(url, disabledList)` | Returns the best plugin for a URL (specific before yt-dlp fallback) |
+| `getPlugin(id)` | Lookup by id |
+| `getAllPlugins()` | `{ downloaders, searchers }` |
+| `getPluginConfig(pluginId, globalConfig)` | Merges `globalConfig.plugins[pluginId]` over `globalConfig` |
+| `checkAllDependencies(globalConfig)` | Calls `checkDependency` on every registered plugin |
+| `loadExternalPlugins(dir)` | Loads all `.js` files from a directory into the registry |
+| `loadPluginFile(filePath)` | Loads a single `.js` file into the registry |
+
+### Plugin Loading Order
+
+1. Built-in plugins registered at module load time (ordered: spotdl → gallery-dl → annie → lux → yt-dlp)
+2. External plugins from `<userData>/plugins/` loaded in `initPlugins()` at window creation
+3. User-imported plugins via IPC `browse-plugin-file` → `loadPluginFile`
+
+### URL Routing
+
+`getDownloaderForUrl` iterates plugins in registry order and returns the first whose `canHandle(url)` returns true. yt-dlp's `canHandle` always returns `true` — it's the catch-all.
+
+Disabled plugins (in `config.disabledPlugins[]`) are skipped.
+
+---
+
+## IPC API
+
+All IPC is invoked via `window.api` in the renderer.
+
+### Async Methods
+
+| Method | Args | Returns | Description |
+|---|---|---|---|
+| `checkDependencies()` | — | `Promise<PluginStatusMap>` | All plugins' dep status |
+| `selectFolder()` | — | `Promise<string \| null>` | Native folder picker |
+| `getDefaultDownloadsFolder()` | — | `Promise<string>` | Current download dir |
+| `openFolder(path)` | `path: string` | `Promise<boolean>` | Open in OS file explorer |
+| `getVideoInfo(url)` | `url: string` | `Promise<{ success, data, pluginId }>` | Auto-routed media info |
+| `startDownload(id, url, opts)` | — | `Promise<boolean>` | Start download process |
+| `cancelDownload(id)` | `id: string` | `Promise<boolean>` | SIGTERM the process |
+| `saveSettings(settings)` | `settings: object` | `Promise<boolean>` | Save global config |
+| `getPluginConfigs()` | — | `Promise<object>` | Per-plugin config map |
+| `savePluginConfigs(configs)` | `configs: object` | `Promise<boolean>` | Save per-plugin configs |
+| `setPluginEnabled(id, enabled)` | `id: string, enabled: bool` | `Promise<boolean>` | Toggle plugin on/off |
+| `importPluginFile(path)` | `path: string` | `Promise<{id, success, error}>` | Load plugin from path |
+| `browsePluginFile()` | — | `Promise<{id, success, error} \| null>` | File picker + load |
+| `openPluginsDir()` | — | `Promise<string>` | Open `<userData>/plugins/` |
+| `ollamaSearch(query)` | `query: string` | `Promise<{results}>` | AI content discovery |
+
+### IPC Events (push from main → renderer)
+
+```js
+window.api.onDownloadProgress(({ downloadId, percent, size, speed, eta, status }) => {})
+window.api.onDownloadComplete(({ downloadId, status }) => {})
+window.api.onDownloadError(({ downloadId, status, error }) => {})
 ```
 
 ---
 
-## ⚙️ Integration with `yt-dlp`
+## Config File (`<userData>/config.json`)
 
-### 1. Metadata Extraction
-To retrieve details about a video quickly without downloading it, the main process runs:
+```json
+{
+  "ytdlpPath": "yt-dlp",
+  "ffmpegPath": "ffmpeg",
+  "downloadFolder": "/Users/x/Downloads",
+  "speedLimit": "",
+  "embedSubtitles": false,
+  "sponsorBlock": false,
+  "disabledPlugins": [],
+  "externalPluginsDir": "<userData>/plugins",
+  "plugins": {
+    "annie":       { "anniePath": "annie", "annieCookie": "" },
+    "lux":         { "luxPath": "lux", "luxMultiThread": false },
+    "gallery-dl":  { "galleryDlPath": "gallery-dl", "galleryDlCookies": "" },
+    "spotdl":      { "spotdlPath": "spotdl", "spotdlFormat": "mp3", "spotdlBitrate": "320k" },
+    "ollama":      { "ollamaHost": "http://localhost:11434", "ollamaModel": "llama3" }
+  }
+}
+```
+
+---
+
+## Development Workflow
+
 ```bash
-yt-dlp --dump-single-json --flat-playlist "VIDEO_URL"
-```
-This returns a comprehensive JSON on `stdout` containing the list of available formats, thumbnail, title, author, and duration.
-
-### 2. Download & Formats Merging
-The download process is handled by spawning `yt-dlp` with customized parameters:
-- **Standard Video Download**: `-f "bestvideo+bestaudio/best"` or resolution-capped `-f "bestvideo[height<=1080]+bestaudio/best"`.
-- **Audio Extraction**: `-x --audio-format mp3` (or other formats like `m4a`, `wav`).
-- **Filenames**: Saved using the template `-o "/download/path/%(title)s.%(ext)s"`.
-- **Subtitles**: Enabled with `--embed-subs --all-subs`.
-- **SponsorBlock**: Patrons/sponsors skipped using `--sponsorblock-remove all`.
-
-### 3. Progress Regex
-The `stdout` of `yt-dlp` is processed line-by-line using the following regex to extract percentage, size, speed, and ETA:
-```javascript
-const progressRegex = /\[download\]\s+([\d.]+)% of\s+(?:~\s*)?([\d.]+\w+) at\s+([\d.]+\w+\/s) ETA\s+([\d:]+)/;
+pnpm install      # Install deps
+pnpm dev          # Vite dev server + Electron (HMR)
+pnpm build        # Production React bundle → dist/
+pnpm package:mac  # Electron packager for macOS
+pnpm package:win  # Windows
+pnpm package:linux
+pnpm package:all
 ```
 
 ---
 
-## 🚀 Development Workflow & Scripts
+## Adding a New Built-in Plugin
 
-Package scripts are defined in `package.json` and are executed via `pnpm`:
-
-- **Install**: `pnpm install` (Installs dependencies).
-- **Dev mode**: `pnpm dev` (Starts Vite dev server and opens the Electron window with HMR).
-- **Build**: `pnpm build` (Generates production-ready static assets in `dist/`).
-- **Packaging**:
-  - `pnpm package:mac`
-  - `pnpm package:win`
-  - `pnpm package:linux`
-  - `pnpm package:all`
+1. Create `electron/plugins/<name>.js` following the plugin interface above
+2. `require` it in `electron/plugin-manager.js` and add it to `BUILTIN_PLUGINS` (before yt-dlp) or `BUILTIN_SEARCHERS`
+3. Add the plugin's `repoUrl` and `installHint` fields
+4. Test `checkDependency`, `canHandle`, `getInfo`, `buildDownloadArgs`, `parseProgress`
 
 ---
 
-## 🗺️ Future Roadmap for Agents
+## Roadmap
 
-If you decide to continue extending the application, here are recommended focus areas:
-
-1. **Auto-download Binaries**: Fetch `yt-dlp` and `ffmpeg` binaries automatically if they are missing on the host system to ensure zero-config onboarding.
-2. **Batch Downloads**: Allow pasting a list of URLs (newline-separated) to add multiple items to the queue at once.
-3. **History Persistence**: Store the list of finished downloads in `config.json` so the history remains visible across application restarts.
-4. **Visual Chapter Selector**: For YouTube videos with chapters, let the user select specific chapters to download (using `yt-dlp`'s `--split-chapters` option).
-5. **Adaptive UI Theme**: Toggle light/dark mode based on the user's OS preference.
+- Auto-download missing binaries (yt-dlp, ffmpeg) on first run
+- Plugin marketplace / registry (browse and install community plugins from a URL)
+- Batch URL input (newline-separated)
+- Download history persistence across restarts
+- Chapter selector for YouTube videos with chapters
+- Light/dark theme toggle

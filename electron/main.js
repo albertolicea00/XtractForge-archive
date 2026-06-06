@@ -1,13 +1,14 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
-const { spawn, execSync } = require('child_process');
+const { spawn } = require('child_process');
 const fs = require('fs');
+const pluginManager = require('./plugin-manager');
 
 let mainWindow;
+// activeDownloads stores { proc, pluginId } per downloadId
 const activeDownloads = new Map();
 const CONFIG_FILE = path.join(app.getPath('userData'), 'config.json');
 
-// Default configuration settings
 let config = {
   ytdlpPath: 'yt-dlp',
   ffmpegPath: 'ffmpeg',
@@ -17,21 +18,24 @@ let config = {
   embedSubtitles: false,
   sponsorBlock: false,
   defaultFormat: 'bestvideo+bestaudio/best',
+  plugins: {},
+  disabledPlugins: [],
+  // Directory where user-installed external plugin .js files are stored
+  externalPluginsDir: path.join(app.getPath('userData'), 'plugins'),
 };
 
-// Load config from file
 function loadConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       const data = fs.readFileSync(CONFIG_FILE, 'utf8');
       config = { ...config, ...JSON.parse(data) };
+      if (!config.plugins) config.plugins = {};
     }
   } catch (err) {
     console.error('Error loading config:', err);
   }
 }
 
-// Save config to file
 function saveConfig() {
   try {
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
@@ -40,15 +44,24 @@ function saveConfig() {
   }
 }
 
+function initPlugins() {
+  const dir = config.externalPluginsDir || path.join(app.getPath('userData'), 'plugins');
+  const results = pluginManager.loadExternalPlugins(dir);
+  if (results.length > 0) {
+    console.log('[PluginManager] External plugins loaded:', results);
+  }
+}
+
 function createWindow() {
   loadConfig();
-  
+  initPlugins();
+
   mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 750,
-    minWidth: 800,
-    minHeight: 600,
-    titleBarStyle: 'hiddenInset', // beautiful native mac top bar, if on mac
+    width: 1200,
+    height: 780,
+    minWidth: 900,
+    minHeight: 640,
+    titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -57,7 +70,6 @@ function createWindow() {
     backgroundColor: '#0c0c0e',
   });
 
-  // Load Vite Dev Server in development, local files in production
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
@@ -67,8 +79,7 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    // Kill any remaining active downloads when app closes
-    for (const [id, proc] of activeDownloads.entries()) {
+    for (const [, { proc }] of activeDownloads.entries()) {
       proc.kill('SIGTERM');
     }
     activeDownloads.clear();
@@ -77,53 +88,27 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC Handler: Check if yt-dlp and ffmpeg are available
+// Check all plugin dependencies
 ipcMain.handle('check-dependencies', () => {
-  const status = { ytdlp: false, ffmpeg: false, ytdlpVersion: '', ffmpegVersion: '' };
-  
-  // Check yt-dlp
-  try {
-    const ytdlpBin = config.ytdlpPath || 'yt-dlp';
-    const out = execSync(`"${ytdlpBin}" --version`, { encoding: 'utf8', timeout: 3000 });
-    status.ytdlp = true;
-    status.ytdlpVersion = out.trim();
-  } catch (e) {
-    status.ytdlp = false;
-  }
-
-  // Check ffmpeg
-  try {
-    const ffmpegBin = config.ffmpegPath || 'ffmpeg';
-    const out = execSync(`"${ffmpegBin}" -version`, { encoding: 'utf8', timeout: 3000 });
-    status.ffmpeg = true;
-    status.ffmpegVersion = out.split('\n')[0].trim();
-  } catch (e) {
-    status.ffmpeg = false;
-  }
-
-  return status;
+  return pluginManager.checkAllDependencies(config);
 });
 
-// IPC Handler: Select download folder
+// Select download folder
 ipcMain.handle('select-folder', async () => {
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
     defaultPath: config.downloadFolder,
   });
-  
   if (!result.canceled && result.filePaths.length > 0) {
     config.downloadFolder = result.filePaths[0];
     saveConfig();
@@ -132,63 +117,96 @@ ipcMain.handle('select-folder', async () => {
   return null;
 });
 
-// IPC Handler: Get default downloads folder
-ipcMain.handle('get-default-downloads-folder', () => {
-  return config.downloadFolder;
-});
+ipcMain.handle('get-default-downloads-folder', () => config.downloadFolder);
 
-// IPC Handler: Get video information via yt-dlp --dump-json
+// Get video/media info — routes to best plugin for the URL
 ipcMain.handle('get-video-info', async (event, url) => {
-  return new Promise((resolve, reject) => {
-    const ytdlpBin = config.ytdlpPath || 'yt-dlp';
-    // Use --dump-single-json to avoid issues with playlists
-    // We also restrict playlist items or grab the flat version to keep it speedy
-    const args = ['--dump-single-json', '--flat-playlist', url];
-    
-    let stdoutData = '';
-    let stderrData = '';
-    
-    const proc = spawn(ytdlpBin, args);
-    
-    proc.stdout.on('data', (data) => {
-      stdoutData += data.toString();
-    });
-    
-    proc.stderr.on('data', (data) => {
-      stderrData += data.toString();
-    });
-    
-    proc.on('close', (code) => {
-      if (code === 0) {
-        try {
-          const info = JSON.parse(stdoutData);
-          resolve({ success: true, data: info });
-        } catch (e) {
-          reject(new Error('Failed to parse video info: ' + e.message));
-        }
-      } else {
-        reject(new Error(stderrData.trim() || `yt-dlp exited with code ${code}`));
-      }
-    });
-
-    proc.on('error', (err) => {
-      reject(new Error(`Failed to execute yt-dlp: ${err.message}`));
-    });
-  });
+  const plugin = pluginManager.getDownloaderForUrl(url, config.disabledPlugins || []);
+  const pluginCfg = pluginManager.getPluginConfig(plugin.id, config);
+  const result = await plugin.getInfo(url, pluginCfg);
+  // Inject which plugin handled this so the renderer can display it
+  if (result.success) result.pluginId = plugin.id;
+  return result;
 });
 
-// IPC Handler: Cancel active download
+// Ollama AI discovery search
+ipcMain.handle('ollama-search', async (event, query) => {
+  const ollamaPlugin = pluginManager.getPlugin('ollama');
+  const cfg = pluginManager.getPluginConfig('ollama', config);
+  return ollamaPlugin.search(query, cfg);
+});
+
+// Get plugin-specific settings
+ipcMain.handle('get-plugin-configs', () => {
+  return config.plugins || {};
+});
+
+// Save plugin-specific settings
+ipcMain.handle('save-plugin-configs', (event, pluginConfigs) => {
+  config.plugins = { ...config.plugins, ...pluginConfigs };
+  saveConfig();
+  return true;
+});
+
+// Save global settings
+ipcMain.handle('save-settings', (event, settings) => {
+  config = { ...config, ...settings };
+  saveConfig();
+  return true;
+});
+
+// Enable or disable a plugin by id
+ipcMain.handle('set-plugin-enabled', (event, pluginId, enabled) => {
+  if (!config.disabledPlugins) config.disabledPlugins = [];
+  if (enabled) {
+    config.disabledPlugins = config.disabledPlugins.filter(id => id !== pluginId);
+  } else {
+    if (!config.disabledPlugins.includes(pluginId)) {
+      config.disabledPlugins.push(pluginId);
+    }
+  }
+  saveConfig();
+  return true;
+});
+
+// Import an external plugin from an absolute file path
+ipcMain.handle('import-plugin-file', (event, filePath) => {
+  return pluginManager.loadPluginFile(filePath);
+});
+
+// Browse for an external plugin file
+ipcMain.handle('browse-plugin-file', async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import XtractForge Plugin',
+    filters: [{ name: 'JavaScript Plugin', extensions: ['js'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  const filePath = result.filePaths[0];
+  return pluginManager.loadPluginFile(filePath);
+});
+
+// Open the external plugins directory in Finder/Explorer
+ipcMain.handle('open-plugins-dir', async () => {
+  const dir = config.externalPluginsDir || path.join(app.getPath('userData'), 'plugins');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  await shell.openPath(dir);
+  return dir;
+});
+
+// Cancel download
 ipcMain.handle('cancel-download', (event, downloadId) => {
-  const proc = activeDownloads.get(downloadId);
-  if (proc) {
-    proc.kill('SIGTERM');
+  const entry = activeDownloads.get(downloadId);
+  if (entry) {
+    entry.proc.kill('SIGTERM');
     activeDownloads.delete(downloadId);
     return true;
   }
   return false;
 });
 
-// IPC Handler: Open download folder in finder/explorer
+// Open folder in OS file explorer
 ipcMain.handle('open-folder', async (event, folderPath) => {
   try {
     const targetPath = folderPath || config.downloadFolder;
@@ -203,104 +221,64 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
   }
 });
 
-// IPC Handler: Start Download
+// Start a download — routes to the plugin that handled the URL's getInfo
 ipcMain.handle('start-download', async (event, downloadId, url, options) => {
-  const ytdlpBin = config.ytdlpPath || 'yt-dlp';
-  const outFolder = options.downloadFolder || config.downloadFolder;
-  
-  // Assemble arguments
-  const args = [];
-  
-  // Output template
-  args.push('-o', path.join(outFolder, '%(title)s.%(ext)s'));
-  
-  // Speed limit
-  if (options.speedLimit || config.speedLimit) {
-    args.push('-r', options.speedLimit || config.speedLimit);
-  }
-  
-  // Format selection
-  if (options.format) {
-    args.push('-f', options.format);
-  } else if (options.audioOnly) {
-    args.push('-x', '--audio-format', options.audioFormat || 'mp3');
-  } else {
-    args.push('-f', config.defaultFormat);
-  }
-  
-  // Subtitles
-  if (options.embedSubtitles || config.embedSubtitles) {
-    args.push('--embed-subs', '--all-subs');
-  }
-  
-  // SponsorBlock
-  if (options.sponsorBlock || config.sponsorBlock) {
-    args.push('--sponsorblock-remove', 'all');
-  }
-  
-  // URL
-  args.push(url);
-  
-  console.log(`Starting download ${downloadId} with command: ${ytdlpBin} ${args.join(' ')}`);
-  
-  const proc = spawn(ytdlpBin, args);
-  activeDownloads.set(downloadId, proc);
-  
-  // Regex to extract progress information from yt-dlp stdout
-  // e.g. [download]  12.3% of ~50.23MiB at  3.45MiB/s ETA 00:12
-  const progressRegex = /\[download\]\s+([\d.]+)% of\s+(?:~\s*)?([\d.]+\w+) at\s+([\d.]+\w+\/s) ETA\s+([\d:]+)/;
-  
+  const pluginId = options.pluginId || 'yt-dlp';
+  const plugin = pluginManager.getPlugin(pluginId) || pluginManager.getPlugin('yt-dlp');
+  const pluginCfg = pluginManager.getPluginConfig(plugin.id, config);
+
+  const downloadOptions = {
+    ...options,
+    downloadFolder: options.downloadFolder || config.downloadFolder,
+    speedLimit: options.speedLimit || config.speedLimit,
+    embedSubtitles: options.embedSubtitles ?? config.embedSubtitles,
+    sponsorBlock: options.sponsorBlock ?? config.sponsorBlock,
+  };
+
+  const { binary, args } = plugin.buildDownloadArgs(url, downloadOptions, pluginCfg);
+
+  console.log(`[${plugin.id}] Starting download ${downloadId}: ${binary} ${args.join(' ')}`);
+
+  const proc = spawn(binary, args);
+  activeDownloads.set(downloadId, { proc, pluginId: plugin.id });
+
   proc.stdout.on('data', (data) => {
     const lines = data.toString().split('\n');
     for (const line of lines) {
-      const match = progressRegex.exec(line);
-      if (match) {
-        const percent = parseFloat(match[1]);
-        const size = match[2];
-        const speed = match[3];
-        const eta = match[4];
-        
-        mainWindow.webContents.send('download-progress', {
-          downloadId,
-          percent,
-          size,
-          speed,
-          eta,
-          status: 'downloading'
-        });
+      const progress = plugin.parseProgress(line);
+      if (progress && mainWindow) {
+        mainWindow.webContents.send('download-progress', { downloadId, ...progress, status: 'downloading' });
       }
     }
   });
 
   proc.stderr.on('data', (data) => {
-    // yt-dlp sometimes sends warnings or errors to stderr
-    console.warn(`[Download ID: ${downloadId} stderr]: ${data.toString()}`);
+    const lines = data.toString().split('\n');
+    for (const line of lines) {
+      const progress = plugin.parseProgress(line);
+      if (progress && mainWindow) {
+        mainWindow.webContents.send('download-progress', { downloadId, ...progress, status: 'downloading' });
+      }
+    }
+    console.warn(`[${plugin.id} stderr]: ${data.toString()}`);
   });
-  
+
   proc.on('close', (code) => {
     activeDownloads.delete(downloadId);
+    if (!mainWindow) return;
     if (code === 0) {
-      mainWindow.webContents.send('download-complete', {
-        downloadId,
-        status: 'completed'
-      });
+      mainWindow.webContents.send('download-complete', { downloadId, status: 'completed' });
     } else {
-      mainWindow.webContents.send('download-error', {
-        downloadId,
-        status: 'error',
-        error: `yt-dlp exited with code ${code}`
-      });
+      mainWindow.webContents.send('download-error', { downloadId, status: 'error', error: `${plugin.name} exited with code ${code}` });
     }
   });
 
   proc.on('error', (err) => {
     activeDownloads.delete(downloadId);
-    mainWindow.webContents.send('download-error', {
-      downloadId,
-      status: 'error',
-      error: err.message
-    });
+    if (mainWindow) {
+      mainWindow.webContents.send('download-error', { downloadId, status: 'error', error: err.message });
+    }
   });
-  
+
   return true;
 });

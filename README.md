@@ -1,69 +1,135 @@
-# XtractForge - yt-dlp GUI
+# XtractForge
 
-A premium, modern, cross-platform desktop graphical user interface (GUI) for the powerful video download engine `yt-dlp`. Built using **Electron**, **React**, and **Vite**.
+A modern, cross-platform desktop GUI for downloading media from 1000+ sites — built on **Electron + React + Vite** with a **plugin architecture** that lets you add, enable, disable, and import community-built downloaders.
+
+## Built-in Plugins
+
+| Plugin | Type | Sites | Repo |
+|---|---|---|---|
+| **yt-dlp** | Downloader | YouTube, Vimeo, Twitter/X, TikTok, 1000+ | [github.com/yt-dlp/yt-dlp](https://github.com/yt-dlp/yt-dlp) |
+| **Annie** | Downloader | Bilibili, Youku, iQiyi, Weibo, Douyin | [github.com/iawia002/annie](https://github.com/iawia002/annie) |
+| **Lux** | Downloader | Bilibili, Douyin, Kuaishou + Annie's sites | [github.com/iawia002/lux](https://github.com/iawia002/lux) |
+| **gallery-dl** | Downloader | DeviantArt, Pixiv, Reddit, Instagram, Danbooru, 200+ | [github.com/mikf/gallery-dl](https://github.com/mikf/gallery-dl) |
+| **spotDL** | Downloader | Spotify tracks, albums, playlists | [github.com/spotDL/spotify-downloader](https://github.com/spotDL/spotify-downloader) |
+| **Ollama AI** | Searcher | Local AI content discovery | [github.com/ollama/ollama](https://github.com/ollama/ollama) |
+
+XtractForge auto-detects which plugin to use based on the URL. yt-dlp is the fallback for anything not handled by a more specific plugin.
 
 ## Features
 
-- 🎨 **Modern Interface**: Premium dark-mode aesthetics featuring sleek glassmorphic panels and glow effects.
-- ⚙️ **Automatic Detection**: Real-time checking of the installation status of `yt-dlp` and `ffmpeg` in your environment.
-- 🔍 **URL Analyzer**: Easily resolves metadata (title, author, thumbnail, duration) before initiating a download.
-- 🖥️ **Quality Selection**: Select from video resolution presets (4K / 1080p / 720p), audio-only downloads (MP3 / M4A / WAV), or granular formats extracted from metadata.
-- 📊 **Download Queue**: Displays real-time download status, percentages, speed limits, and Estimated Time of Arrival (ETA).
-- 📁 **Folder Management**: Select custom destinations and access folder contents instantly.
-- ⚙️ **Advanced Settings**: Configure custom speed limits, subtitle embedding, SponsorBlock integration, and custom binary paths for both `yt-dlp` and `ffmpeg`.
+- **Plugin system** — enable/disable any plugin; import community plugins as `.js` files
+- **AI Discover tab** — describe what you want; Ollama suggests search queries to download
+- **URL auto-detection** — routes each URL to the right plugin automatically
+- **Download queue** — real-time progress, speed, ETA, cancel
+- **Format selection** — video quality presets, audio-only, or raw format picker
+- **Per-plugin settings** — binary paths, cookies, bitrate, AI model name, etc.
+- **Dark UI** — glassmorphic dark theme
 
 ## Prerequisites
 
-Ensure you have the following components installed on your machine:
+Install Node.js 16+ and pnpm. Then install whichever download tools you need:
 
-1. [Node.js](https://nodejs.org/) (Version 16 or newer)
-2. [pnpm](https://pnpm.io/)
-3. [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-4. [ffmpeg](https://ffmpeg.org/) (required to merge high-quality audio and video formats)
+```bash
+# yt-dlp + ffmpeg (required for most video sites)
+pip install yt-dlp
+brew install ffmpeg
+
+# gallery-dl (image galleries)
+pip install gallery-dl
+
+# spotDL (Spotify)
+pip install spotdl
+
+# Annie / Lux (Asian platforms)
+brew install annie
+brew install lux
+
+# Ollama (AI discovery)
+# Download from https://ollama.com then:
+ollama pull llama3
+```
+
+You only need the tools you plan to use. Missing tools are shown in the Plugins tab with install hints.
 
 ## Getting Started
 
-### 1. Install Dependencies
-
-From the project root directory, run:
-
 ```bash
 pnpm install
-```
-
-### 2. Run in Development Mode
-
-To start the Vite development server with Hot Module Replacement (HMR) and open the Electron wrapper concurrently:
-
-```bash
 pnpm dev
 ```
 
-### 3. Build & Package
+Build for production:
 
-To compile the React bundle and package the application into a standalone desktop installer for your OS:
-
-#### macOS:
 ```bash
 pnpm package:mac
-```
-
-#### Windows:
-```bash
 pnpm package:win
-```
-
-#### Linux:
-```bash
 pnpm package:linux
+pnpm package:all
 ```
 
-All generated distribution packages are saved in the `dist-package/` directory.
+Packages are saved to `dist-package/`.
 
-## Codebase Architecture
+## Writing a Plugin
 
-- `electron/main.js`: Main process entry point. Handles Electron's lifecycle, settings file persistence, system actions, and spawns the `yt-dlp` sub-processes.
-- `electron/preload.js`: Secure IPC bridge separating Node.js capabilities from the browser view.
-- `src/`: React frontend directory.
-  - `src/App.jsx`: Core application component managing state transitions, tabs, and event handlers.
-  - `src/index.css`: Styling sheets implementing the custom dark-theme system, animations, and typography tokens.
+A plugin is a single `.js` file. Drop it in the **Plugins Folder** (accessible from the Plugins tab) or use **Import Plugin**.
+
+```js
+module.exports = {
+  id: 'my-tool',
+  name: 'My Tool',
+  description: 'Downloads from example.com',
+  type: 'downloader',       // 'downloader' | 'searcher'
+  icon: '🔧',
+  repoUrl: 'https://github.com/org/my-tool',
+  installHint: 'pip install my-tool',
+
+  configSchema: [
+    { key: 'myToolPath', label: 'Binary path', type: 'text', default: 'my-tool', placeholder: '/usr/local/bin/my-tool' },
+    { key: 'myFlag',     label: 'Enable X',    type: 'toggle', default: false },
+    { key: 'myFormat',   label: 'Format',      type: 'select', default: 'mp4', options: ['mp4', 'mkv'] },
+  ],
+
+  checkDependency(config) {
+    // Return { available: bool, version: string }
+  },
+
+  canHandle(url) {
+    return url.includes('example.com');
+  },
+
+  async getInfo(url, config) {
+    // Return { success: true, data: { title, thumbnail, thumbnails, duration, uploader, formats, _plugin } }
+  },
+
+  buildDownloadArgs(url, options, config) {
+    // Return { binary: string, args: string[] }
+  },
+
+  parseProgress(line) {
+    // Return { percent, speed, eta, size } or null
+  },
+};
+```
+
+See [electron/plugins/ytdlp.js](electron/plugins/ytdlp.js) for a complete reference implementation.
+
+## Architecture
+
+```
+electron/
+  main.js              Main process — IPC handlers, plugin dispatch
+  preload.js           Secure IPC bridge (contextBridge)
+  plugin-manager.js    Plugin registry, URL routing, dependency checks, external loading
+  plugins/
+    ytdlp.js           yt-dlp plugin
+    annie.js           Annie plugin
+    lux.js             Lux plugin
+    gallery-dl.js      gallery-dl plugin
+    spotdl.js          spotDL plugin
+    ollama.js          Ollama AI searcher
+src/
+  App.jsx              React UI — Download, Queue, AI Discover, Plugins, Settings
+  index.css            Dark theme
+```
+
+External plugins live in `<userData>/plugins/` and are loaded automatically on startup.
