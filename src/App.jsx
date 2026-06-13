@@ -166,9 +166,11 @@ export default function App() {
   const [importResult, setImportResult] = useState(null);
   // Tracks which plugin's install command was just copied (for "Copied!" feedback)
   const [copiedInstall, setCopiedInstall] = useState(null);
-  // Which plugin's settings section is expanded in the Settings tab (null = all collapsed)
-  const [expandedPlugin, setExpandedPlugin] = useState(null);
-  // Scroll container for the main content area (used to scroll to a plugin's settings)
+  // Which plugin's detail/settings page is open in the Plugins tab (null = card grid)
+  const [selectedPlugin, setSelectedPlugin] = useState(null);
+  // Transient "Saved" confirmation key (e.g. `plugin:yt-dlp`), cleared after a moment
+  const [savedFlash, setSavedFlash] = useState(null);
+  // Scroll container for the main content area
   const mainRef = useRef(null);
 
   // Themes
@@ -186,8 +188,18 @@ export default function App() {
       setPluginStatus(status);
       const configs = await window.api.getPluginConfigs();
       setPluginConfigs(configs);
-      const folder = await window.api.getDefaultDownloadsFolder();
-      setSettings(prev => ({ ...prev, downloadFolder: folder }));
+      // Hydrate persisted global settings + disabled plugins from config.json
+      const saved = await window.api.getSettings();
+      if (saved) {
+        setSettings(prev => ({
+          ...prev,
+          downloadFolder: saved.downloadFolder || prev.downloadFolder,
+          speedLimit: saved.speedLimit || '',
+          embedSubtitles: !!saved.embedSubtitles,
+          sponsorBlock: !!saved.sponsorBlock,
+        }));
+        setDisabledPlugins(saved.disabledPlugins || []);
+      }
     } catch (err) {
       console.error('Failed to check dependencies:', err);
     } finally {
@@ -340,7 +352,7 @@ export default function App() {
 
   const handleSelectFolder = async () => {
     const folder = await window.api.selectFolder();
-    if (folder) setSettings(prev => ({ ...prev, downloadFolder: folder }));
+    if (folder) { setSettings(prev => ({ ...prev, downloadFolder: folder })); flashSaved('global'); }
   };
 
   // ── Plugin management ─────────────────────────────────────────────────────
@@ -371,28 +383,36 @@ export default function App() {
     }
   };
 
-  // Jump to Settings tab with this plugin's section expanded and scrolled into view.
-  // Scroll the main-content container only — scrollIntoView would also move the
-  // window/app shell, leaving the whole interface shifted up.
-  const goToPluginSettings = (id) => {
-    setExpandedPlugin(id);
-    setActiveTab('settings');
-    setTimeout(() => {
-      const el = document.getElementById(`plugin-settings-${id}`);
-      const container = mainRef.current;
-      if (el && container) {
-        const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 16;
-        container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      }
-    }, 80);
+  // Open a plugin's detail/settings page (and scroll the content back to top)
+  const openPluginDetail = (id) => {
+    setSelectedPlugin(id);
+    if (mainRef.current) mainRef.current.scrollTo({ top: 0 });
   };
 
-  const togglePluginSettings = (id) => setExpandedPlugin(prev => (prev === id ? null : id));
+  // Briefly show a "Saved" confirmation for a given key
+  const flashSaved = (key) => {
+    setSavedFlash(key);
+    setTimeout(() => setSavedFlash(prev => (prev === key ? null : prev)), 1600);
+  };
 
-  const handleSaveSettings = async () => {
-    await window.api.saveSettings(settings);
-    await window.api.savePluginConfigs(pluginConfigs);
-    await refreshPlugins();
+  // Update one plugin config field and persist immediately (auto-save)
+  const updatePluginConfig = (id, key, value) => {
+    setPluginConfigs(prev => {
+      const next = { ...prev, [id]: { ...(prev[id] || {}), [key]: value } };
+      window.api.savePluginConfigs(next);
+      return next;
+    });
+    flashSaved(`plugin:${id}`);
+  };
+
+  // Update a global setting and persist immediately (auto-save)
+  const updateSetting = (patch) => {
+    setSettings(prev => {
+      const next = { ...prev, ...patch };
+      window.api.saveSettings(next);
+      return next;
+    });
+    flashSaved('global');
   };
 
   // ── Theme management ──────────────────────────────────────────────────────
@@ -430,6 +450,7 @@ export default function App() {
 
   return (
     <div className="app-container">
+      <div className="titlebar-drag"></div>
       <div className="bg-glow-1"></div>
       <div className="bg-glow-2"></div>
 
@@ -450,7 +471,7 @@ export default function App() {
             <li
               key={id}
               className={`nav-item ${activeTab === id ? 'active' : ''}`}
-              onClick={() => setActiveTab(id)}
+              onClick={() => { setActiveTab(id); if (id === 'plugins') setSelectedPlugin(null); }}
             >
               {icon}
               <span>{label}</span>
@@ -772,133 +793,220 @@ export default function App() {
         )}
 
         {/* ── TAB: Plugins ────────────────────────────────────────────────── */}
-        {activeTab === 'plugins' && (
+        {activeTab === 'plugins' && !selectedPlugin && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="glass-card">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Puzzle size={20} style={{ color: 'var(--primary)' }} /> Plugins
-                  </h2>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                    Enable or disable tools. Import community plugins (.js files following the XtractForge plugin interface).
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button className="btn btn-secondary" onClick={() => window.api.openPluginsDir()} style={{ fontSize: '13px', padding: '8px 14px' }}>
-                    <FolderOpen size={14} /> Plugins Folder
-                  </button>
-                  <button className="btn btn-primary" onClick={handleImportPlugin} style={{ fontSize: '13px', padding: '8px 14px' }}>
-                    <UploadCloud size={14} /> Import Plugin
-                  </button>
-                </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Puzzle size={22} style={{ color: 'var(--primary)' }} /> Plugins
+                </h2>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px', maxWidth: '520px', lineHeight: 1.5 }}>
+                  Manage and configure your extraction engines. Enable what you need, or import community-built modules.
+                </p>
               </div>
-
-              {/* Security warning — external plugins run with full Node.js access in the main process */}
-              <div className="error-banner" style={{ marginBottom: '16px', background: 'rgba(244, 63, 94, 0.1)', borderColor: 'var(--text-error)' }}>
-                <ShieldAlert size={20} />
-                <div>
-                  <strong>Only import plugins you trust</strong>
-                  <p style={{ fontSize: '12px', marginTop: '2px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    A plugin is executable code that runs with full access to your computer — files, network, and shell commands.
-                    A malicious plugin from an unknown author can steal data or damage your system. Never import a <code>.js</code> file
-                    from someone you don't trust, and read the source before installing.
-                  </p>
-                </div>
-              </div>
-
-              {importResult && (
-                <div className={importResult.success ? 'error-banner' : 'error-banner'} style={{ marginBottom: '16px', borderColor: importResult.success ? 'var(--text-success)' : undefined }}>
-                  {importResult.success ? <CheckCircle2 size={18} style={{ color: 'var(--text-success)' }} /> : <AlertTriangle size={18} />}
-                  <div>
-                    <strong>{importResult.success ? `Plugin "${importResult.id}" imported` : 'Import failed'}</strong>
-                    {!importResult.success && <p style={{ fontSize: '12px', marginTop: '2px' }}>{importResult.error}</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* Downloader plugins */}
-              <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>Downloaders</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-                {downloaderPlugins.map(([id, plugin]) => {
-                  const enabled = !disabledPlugins.includes(id);
-                  return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)', border: `1px solid ${enabled && plugin.available ? 'var(--border-color)' : 'var(--border-color)'}`, opacity: enabled ? 1 : 0.5 }}>
-                      <div style={{ fontSize: '24px' }}>{plugin.icon}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 600, fontSize: '14px' }}>{plugin.name}</span>
-                          {plugin.isBuiltin && <span style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary)', borderRadius: '10px' }}>built-in</span>}
-                          <span style={{ fontSize: '11px', color: plugin.available ? 'var(--text-success)' : 'var(--text-error)' }}>
-                            {plugin.available ? `● v${plugin.version}` : '○ not found'}
-                          </span>
-                          {plugin.repoUrl && (
-                            <button
-                              onClick={() => window.api.openExternal(plugin.repoUrl)}
-                              title={plugin.repoUrl}
-                              aria-label="Open project website"
-                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
-                            >
-                              <Globe size={14} />
-                            </button>
-                          )}
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{plugin.description}</div>
-                        {!plugin.available && resolveInstall(plugin, window.api.platform) && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Install</span>
-                            <code style={{ fontSize: '12px', color: 'var(--text-secondary)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '4px 8px' }}>
-                              {resolveInstall(plugin, window.api.platform)}
-                            </code>
-                            <button
-                              className="btn btn-secondary"
-                              style={{ padding: '4px 10px', fontSize: '11px' }}
-                              onClick={() => handleCopyInstall(id, resolveInstall(plugin, window.api.platform))}
-                            >
-                              {copiedInstall === id ? <><Check size={12} style={{ color: 'var(--text-success)' }} /> Copied</> : <><Copy size={12} /> Copy</>}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {plugin.configSchema && plugin.configSchema.length > 0 && (
-                          <button
-                            className="btn btn-secondary"
-                            style={{ padding: '8px 10px', fontSize: '12px' }}
-                            onClick={() => goToPluginSettings(id)}
-                            title={`${plugin.name} settings`}
-                            aria-label={`${plugin.name} settings`}
-                          >
-                            <Sliders size={14} />
-                          </button>
-                        )}
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '8px 12px', fontSize: '12px' }}
-                          onClick={() => handleTogglePlugin(id, enabled)}
-                        >
-                          {enabled ? <><ToggleRight size={14} style={{ color: 'var(--primary)' }} /> Enabled</> : <><ToggleLeft size={14} /> Disabled</>}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-                <div>
-                  <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Building a plugin</h4>
-                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    Plugins are single <code>.js</code> files. The full API reference and examples live on GitHub.
-                  </p>
-                </div>
-                <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => window.api.openExternal('https://github.com/albertolicea00/XtractForge/blob/main/ADDONS.md')}>
-                  <Globe size={14} /> Plugin docs
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="btn btn-secondary" onClick={() => window.api.openPluginsDir()} style={{ fontSize: '13px', padding: '8px 14px' }}>
+                  <FolderOpen size={14} /> Plugins Folder
+                </button>
+                <button className="btn btn-primary" onClick={handleImportPlugin} style={{ fontSize: '13px', padding: '8px 14px' }}>
+                  <UploadCloud size={14} /> Import from Community
                 </button>
               </div>
             </div>
+
+            {/* Security warning — external plugins run with full Node.js access in the main process */}
+            <div className="error-banner" style={{ margin: 0, background: 'rgba(244, 63, 94, 0.1)', borderColor: 'var(--text-error)' }}>
+              <ShieldAlert size={20} />
+              <div>
+                <strong>Only import plugins you trust</strong>
+                <p style={{ fontSize: '12px', marginTop: '2px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  A plugin is executable code that runs with full access to your computer — files, network, and shell commands.
+                  A malicious plugin from an unknown author can steal data or damage your system. Never import a <code>.js</code> file
+                  from someone you don't trust, and read the source before installing.
+                </p>
+              </div>
+            </div>
+
+            {importResult && (
+              <div className="error-banner" style={{ margin: 0, borderColor: importResult.success ? 'var(--text-success)' : undefined }}>
+                {importResult.success ? <CheckCircle2 size={18} style={{ color: 'var(--text-success)' }} /> : <AlertTriangle size={18} />}
+                <div>
+                  <strong>{importResult.success ? `Plugin "${importResult.id}" imported` : 'Import failed'}</strong>
+                  {!importResult.success && <p style={{ fontSize: '12px', marginTop: '2px' }}>{importResult.error}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* Plugin cards — built-ins by `order`, imported ones in import order after */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+              {downloaderPlugins.map(([id, plugin]) => {
+                const enabled = !disabledPlugins.includes(id);
+                return (
+                  <div key={id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px', opacity: enabled ? 1 : 0.55, transition: 'var(--transition-fast)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                        <div style={{ width: '44px', height: '44px', flexShrink: 0, borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+                          {plugin.icon}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '17px', fontWeight: 700 }}>{plugin.name}</div>
+                          {(plugin.tag || plugin.isBuiltin) && (
+                            <span style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--primary)' }}>
+                              {plugin.tag || (plugin.isBuiltin ? 'Built-in' : 'Community')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <label className="switch" style={{ flexShrink: 0 }} title={enabled ? 'Enabled' : 'Disabled'}>
+                        <input type="checkbox" checked={enabled} onChange={() => handleTogglePlugin(id, enabled)} />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
+
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, flex: 1 }}>{plugin.description}</p>
+
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '14px' }}>
+                      <div>
+                        <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Version</div>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: plugin.available ? 'var(--text-primary)' : 'var(--text-error)' }}>
+                          {plugin.available ? plugin.version.replace(/[^0-9.]/g, "") : 'Not installed'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => openPluginDetail(id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', cursor: 'pointer', fontSize: '14px', fontWeight: 600, fontFamily: 'var(--font-sans)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0 }}
+                      >
+                        Settings <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+              <div>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Building a plugin</h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Plugins are single <code>.js</code> files. The full API reference and examples live on GitHub.
+                </p>
+              </div>
+              <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => window.api.openExternal('https://github.com/albertolicea00/XtractForge/blob/main/ADDONS.md')}>
+                <Globe size={14} /> Plugin docs
+              </button>
+            </div>
           </div>
         )}
+
+        {/* ── Plugin detail / settings page ───────────────────────────────── */}
+        {activeTab === 'plugins' && selectedPlugin && pluginStatus[selectedPlugin] && (() => {
+          const id = selectedPlugin;
+          const plugin = pluginStatus[id];
+          const enabled = !disabledPlugins.includes(id);
+          const cfg = pluginConfigs[id] || {};
+          const installCmd = !plugin.available ? resolveInstall(plugin, window.api.platform) : '';
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <button
+                onClick={() => setSelectedPlugin(null)}
+                style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '13px', fontFamily: 'var(--font-sans)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0 }}
+              >
+                <ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} /> All plugins
+              </button>
+
+              <div className="glass-card">
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
+                    <div style={{ width: '52px', height: '52px', flexShrink: 0, borderRadius: 'var(--radius-md)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px' }}>
+                      {plugin.icon}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <h2 style={{ fontSize: '20px', fontWeight: 700 }}>{plugin.name}</h2>
+                        <span style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary)', borderRadius: '10px' }}>
+                          {plugin.isBuiltin ? 'built-in' : (plugin.author || 'community')}
+                        </span>
+                        <span style={{ fontSize: '11px', color: plugin.available ? 'var(--text-success)' : 'var(--text-error)' }}>
+                          {plugin.available ? `● v${plugin.version.replace(/[^0-9.]/g, "")}` : '○ not installed'}
+                        </span>
+                        {plugin.repoUrl && (
+                          <button onClick={() => window.api.openExternal(plugin.repoUrl)} title={plugin.repoUrl} aria-label="Open project website" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}>
+                            <Globe size={14} />
+                          </button>
+                        )}
+                      </div>
+                      <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>{plugin.description}</p>
+                    </div>
+                  </div>
+                  <label className="switch" style={{ flexShrink: 0 }} title={enabled ? 'Enabled' : 'Disabled'}>
+                    <input type="checkbox" checked={enabled} onChange={() => handleTogglePlugin(id, enabled)} />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+
+                {/* Install command when the binary is missing */}
+                {installCmd && (
+                  <div style={{ marginTop: '16px', padding: '14px 16px', background: 'rgba(244, 63, 94, 0.08)', border: '1px solid rgba(244, 63, 94, 0.25)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      <strong style={{ color: 'var(--text-error)' }}>Not installed.</strong> Run this in your terminal to install it:
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <code style={{ fontSize: '13px', color: 'var(--text-primary)', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '6px 10px' }}>{installCmd}</code>
+                      <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }} onClick={() => handleCopyInstall(id, installCmd)}>
+                        {copiedInstall === id ? <><Check size={13} style={{ color: 'var(--text-success)' }} /> Copied</> : <><Copy size={13} /> Copy</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Configuration */}
+              <div className="glass-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <Sliders size={18} style={{ color: 'var(--primary)' }} />
+                  <h3 style={{ fontSize: '15px', fontWeight: 600 }}>Configuration</h3>
+                  {savedFlash === `plugin:${id}` && (
+                    <span style={{ fontSize: '12px', color: 'var(--text-success)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={13} /> Saved
+                    </span>
+                  )}
+                </div>
+
+                {plugin.configSchema && plugin.configSchema.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {plugin.configSchema.map(field => (
+                      <div key={field.key} className="input-group" style={{ marginBottom: 0 }}>
+                        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          {field.label}
+                          {field.help && (
+                            <span className="help-tip" data-tip={field.help}>
+                              <HelpCircle size={13} />
+                            </span>
+                          )}
+                        </label>
+                        {field.type === 'toggle' ? (
+                          <label className="switch">
+                            <input type="checkbox" checked={!!(cfg[field.key] ?? field.default)} onChange={(e) => updatePluginConfig(id, field.key, e.target.checked)} />
+                            <span className="slider"></span>
+                          </label>
+                        ) : field.type === 'select' ? (
+                          <select value={cfg[field.key] ?? field.default} onChange={(e) => updatePluginConfig(id, field.key, e.target.value)} style={{ padding: '10px 12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
+                            {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : (
+                          <input type="text" placeholder={field.placeholder || ''} value={cfg[field.key] ?? field.default ?? ''} onChange={(e) => updatePluginConfig(id, field.key, e.target.value)} style={{ padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
+                        )}
+                      </div>
+                    ))}
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>Changes are saved automatically.</p>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>This plugin has no configurable options.</p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ── TAB: Themes ─────────────────────────────────────────────────── */}
         {activeTab === 'themes' && (
@@ -1074,8 +1182,15 @@ export default function App() {
         {activeTab === 'settings' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div className="glass-card">
-              <h2 style={{ fontSize: '18px', fontWeight: 600 }}>Settings</h2>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', marginBottom: '20px' }}>Global defaults and per-plugin configuration.</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 600 }}>Settings</h2>
+                {savedFlash === 'global' && (
+                  <span style={{ fontSize: '12px', color: 'var(--text-success)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Check size={13} /> Saved
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px', marginBottom: '20px' }}>App-wide defaults. Changes are saved automatically.</p>
 
               <div className="settings-grid">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -1091,12 +1206,12 @@ export default function App() {
 
                   <div className="input-group" style={{ marginBottom: 0 }}>
                     <label>Download Speed Limit</label>
-                    <input type="text" placeholder="50K, 10M (empty = unlimited)" value={settings.speedLimit} onChange={(e) => setSettings(prev => ({ ...prev, speedLimit: e.target.value }))} style={{ padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
+                    <input type="text" placeholder="50K, 10M (empty = unlimited)" value={settings.speedLimit} onChange={(e) => updateSetting({ speedLimit: e.target.value })} style={{ padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>yt-dlp Defaults</h3>
+                  <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Download Defaults</h3>
 
                   <div className="toggle-group">
                     <div className="toggle-row">
@@ -1104,90 +1219,33 @@ export default function App() {
                         <span className="toggle-title">Embed Subtitles</span>
                         <span className="toggle-desc">Download and embed subtitles into video files.</span>
                       </div>
-                      <label className="switch"><input type="checkbox" checked={settings.embedSubtitles} onChange={(e) => setSettings(prev => ({ ...prev, embedSubtitles: e.target.checked }))} /><span className="slider"></span></label>
+                      <label className="switch"><input type="checkbox" checked={settings.embedSubtitles} onChange={(e) => updateSetting({ embedSubtitles: e.target.checked })} /><span className="slider"></span></label>
                     </div>
                     <div className="toggle-row">
                       <div className="toggle-details">
                         <span className="toggle-title">SponsorBlock</span>
                         <span className="toggle-desc">Remove sponsor segments from YouTube downloads.</span>
                       </div>
-                      <label className="switch"><input type="checkbox" checked={settings.sponsorBlock} onChange={(e) => setSettings(prev => ({ ...prev, sponsorBlock: e.target.checked }))} /><span className="slider"></span></label>
+                      <label className="switch"><input type="checkbox" checked={settings.sponsorBlock} onChange={(e) => updateSetting({ sponsorBlock: e.target.checked })} /><span className="slider"></span></label>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Per-plugin settings — collapsed by default, expand on click or via a plugin's Settings button */}
-            {Object.entries(pluginStatus)
-              .sort((a, b) => (a[1].order ?? 99) - (b[1].order ?? 99))
-              .map(([id, plugin]) => {
-              if (!plugin.configSchema || plugin.configSchema.length === 0) return null;
-              const cfg = pluginConfigs[id] || {};
-              const expanded = expandedPlugin === id;
-              return (
-                <div key={id} id={`plugin-settings-${id}`} className="glass-card" style={{ scrollMarginTop: '16px', padding: expanded ? '24px' : '16px 24px' }}>
-                  <div
-                    onClick={() => togglePluginSettings(id)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
-                  >
-                    <ChevronRight size={16} style={{ color: 'var(--text-muted)', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'var(--transition-fast)' }} />
-                    <span style={{ fontSize: '18px' }}>{plugin.icon}</span>
-                    <h3 style={{ fontSize: '15px', fontWeight: 600 }}>{plugin.name} Settings</h3>
-                    <span style={{ fontSize: '11px', color: plugin.available ? 'var(--text-success)' : 'var(--text-error)', fontWeight: 400 }}>
-                      {plugin.available ? '● installed' : '○ not installed'}
-                    </span>
-                    {plugin.repoUrl && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); window.api.openExternal(plugin.repoUrl); }}
-                        title={plugin.repoUrl}
-                        aria-label="Open project website"
-                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        <Globe size={14} />
-                      </button>
-                    )}
-                  </div>
-                  {expanded && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
-                      {plugin.description && (
-                        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '4px' }}>
-                          {plugin.description}
-                        </p>
-                      )}
-                      {plugin.configSchema.map(field => (
-                        <div key={field.key} className="input-group" style={{ marginBottom: 0 }}>
-                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            {field.label}
-                            {field.help && (
-                              <span className="help-tip" data-tip={field.help}>
-                                <HelpCircle size={13} />
-                              </span>
-                            )}
-                          </label>
-                          {field.type === 'toggle' ? (
-                            <label className="switch">
-                              <input type="checkbox" checked={!!(cfg[field.key] ?? field.default)} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.checked } }))} />
-                              <span className="slider"></span>
-                            </label>
-                          ) : field.type === 'select' ? (
-                            <select value={cfg[field.key] ?? field.default} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.value } }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
-                              {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          ) : (
-                            <input type="text" placeholder={field.placeholder || ''} value={cfg[field.key] ?? field.default ?? ''} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.value } }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-              <button onClick={refreshPlugins} className="btn btn-secondary">Re-detect Tools</button>
-              <button onClick={handleSaveSettings} className="btn btn-primary">Save Settings</button>
+            {/* Per-plugin config lives in each plugin's own page */}
+            <div className="info-banner" style={{ margin: 0 }}>
+              <Sliders size={18} />
+              <div style={{ flex: 1 }}>
+                <strong>Configuring download tools</strong>
+                <p style={{ fontSize: '12px', marginTop: '2px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Each CLI tool (yt-dlp, spotDL, gallery-dl, Lux…) has its own settings — binary path, format, cookies, etc.
+                  Open the <strong>Plugins</strong> tab, pick a plugin, and click <strong>Settings</strong>.
+                </p>
+              </div>
+              <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => { setActiveTab('plugins'); setSelectedPlugin(null); }}>
+                <Puzzle size={14} /> Open Plugins
+              </button>
             </div>
           </div>
         )}

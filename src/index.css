@@ -86,8 +86,26 @@ body {
   width: 100vw;
   overflow: hidden;
   position: relative;
-  /* Top padding to allow space for Mac OS titlebar if needed */
-  padding-top: 24px;
+  /* Top padding leaves room for the draggable titlebar + macOS traffic lights */
+  padding-top: 38px;
+}
+
+/* Draggable titlebar strip — lets the frameless/hiddenInset window be moved by
+   grabbing the top edge. Interactive controls below opt back out with no-drag. */
+.titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 38px;
+  -webkit-app-region: drag;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+/* Keep clickable elements interactive even if they sit near the drag strip */
+button, a, input, select, textarea, .nav-item, .switch {
+  -webkit-app-region: no-drag;
 }
 
 /* Background Glowing Orbs */

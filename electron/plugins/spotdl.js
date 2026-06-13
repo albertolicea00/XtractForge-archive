@@ -5,6 +5,7 @@ module.exports = {
   id: 'spotdl',
   name: 'spotDL',
   order: 3,
+  tag: 'Audio',
   description: 'Download Spotify tracks, albums, and playlists as high-quality audio',
   type: 'downloader',
   icon: '🎵',

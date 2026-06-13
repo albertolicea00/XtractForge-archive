@@ -11,6 +11,7 @@ module.exports = {
   id: 'lux',
   name: 'Lux',
   order: 4,
+  tag: 'Asian sites',
   description: 'Fast media downloader for Bilibili, Douyin, Kuaishou, and more',
   type: 'downloader',
   icon: '⚡',

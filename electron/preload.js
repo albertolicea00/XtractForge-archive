@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   cancelDownload: (downloadId) => ipcRenderer.invoke('cancel-download', downloadId),
 
   // Settings
+  getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
   getPluginConfigs: () => ipcRenderer.invoke('get-plugin-configs'),
   savePluginConfigs: (configs) => ipcRenderer.invoke('save-plugin-configs', configs),

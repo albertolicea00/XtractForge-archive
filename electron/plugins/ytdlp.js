@@ -7,6 +7,7 @@ module.exports = {
   id: 'yt-dlp',
   name: 'yt-dlp',
   order: 1,   // display order in the Plugins tab (routing order is separate)
+  tag: 'Core engine',   // short category label shown on the plugin card
   description: 'Download from YouTube, Vimeo, Twitter/X, TikTok, and 1000+ sites',
   type: 'downloader',
   icon: '▶',

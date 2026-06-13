@@ -144,6 +144,17 @@ ipcMain.handle('get-video-info', async (event, url) => {
   return result;
 });
 
+// Get global settings (persisted app-wide config) for the renderer to hydrate state
+ipcMain.handle('get-settings', () => ({
+  ytdlpPath: config.ytdlpPath,
+  ffmpegPath: config.ffmpegPath,
+  downloadFolder: config.downloadFolder,
+  speedLimit: config.speedLimit || '',
+  embedSubtitles: !!config.embedSubtitles,
+  sponsorBlock: !!config.sponsorBlock,
+  disabledPlugins: config.disabledPlugins || [],
+}));
+
 // Get plugin-specific settings
 ipcMain.handle('get-plugin-configs', () => {
   return config.plugins || {};
