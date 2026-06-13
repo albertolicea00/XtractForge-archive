@@ -5,6 +5,9 @@ const fs = require('fs');
 const pluginManager = require('./plugin-manager');
 const themeManager = require('./theme-manager');
 
+// Set the app/dock name before ready so it isn't shown as "Electron" in dev
+app.setName('XtractForge');
+
 let mainWindow;
 // activeDownloads stores { proc, pluginId } per downloadId
 const activeDownloads = new Map();
@@ -24,8 +27,8 @@ let config = {
   // Directory where user-installed external plugin .js files are stored
   externalPluginsDir: path.join(app.getPath('userData'), 'plugins'),
   // Theming
-  activeTheme: 'cyber-glass',
-  themeSettings: { accentOverride: '', glassIntensity: 75, monoFont: false },
+  activeTheme: 'xtractforge-default',
+  themeSettings: { accentOverride: '#34d399', glassIntensity: 75, monoFont: true },
   // Directory where user-installed external theme .js files are stored
   externalThemesDir: path.join(app.getPath('userData'), 'themes'),
 };
@@ -103,6 +106,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Set the dock icon in development (packaged builds use the bundle icon)
+  if (process.platform === 'darwin' && app.dock) {
+    try { app.dock.setIcon(path.join(__dirname, '../icons/AppIcon512.png')); } catch {}
+  }
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

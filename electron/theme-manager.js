@@ -3,6 +3,7 @@ const fs = require('fs');
 
 // Built-in themes registered at module load time.
 const BUILTIN_THEMES = [
+  require('./themes/xtractforge-default'),
   require('./themes/cyber-glass'),
   require('./themes/alexandria'),
   require('./themes/matrix'),

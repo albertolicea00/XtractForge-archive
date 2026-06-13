@@ -129,7 +129,10 @@ function applyTheme(theme, settings) {
     el.id = 'xf-theme';
     document.head.appendChild(el);
   }
-  el.textContent = buildThemeCss(theme, settings);
+  const css = buildThemeCss(theme, settings);
+  el.textContent = css;
+  // Cache so the next launch can paint the chosen theme instantly (no flash)
+  try { localStorage.setItem('xf-theme-css', css); } catch {}
 }
 
 const ACCENT_PRESETS = ['#adc6ff', '#ff8a80', '#34d399', '#c4b5fd', '#fbbf24'];
@@ -201,8 +204,8 @@ export default function App() {
 
   // Themes
   const [themes, setThemes] = useState([]);
-  const [activeThemeId, setActiveThemeId] = useState('cyber-glass');
-  const [themeSettings, setThemeSettings] = useState({ accentOverride: '', glassIntensity: 75, monoFont: false });
+  const [activeThemeId, setActiveThemeId] = useState('xtractforge-default');
+  const [themeSettings, setThemeSettings] = useState({ accentOverride: '#34d399', glassIntensity: 75, monoFont: true });
   const [themeImportResult, setThemeImportResult] = useState(null);
 
   // ── Init ──────────────────────────────────────────────────────────────────

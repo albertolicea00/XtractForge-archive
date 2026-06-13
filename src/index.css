@@ -1,38 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  
+  /* Default = XtractForge Default theme (Nord surfaces, emerald accent, mono).
+     Matches electron/themes/xtractforge-default.js so the first paint is correct. */
+  --font-sans: 'SFMono-Regular', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
   /* Color Palette */
-  --bg-deep: #08080a;
-  --bg-dark: #0f0f13;
-  --bg-card: rgba(22, 22, 29, 0.7);
-  --bg-panel: rgba(16, 16, 21, 0.9);
-  --bg-input: rgba(30, 30, 40, 0.5);
+  --bg-deep: #242933;
+  --bg-dark: #2e3440;
+  --bg-card: rgba(46, 52, 64, 0.7);
+  --bg-panel: rgba(36, 41, 51, 0.9);
+  --bg-input: rgba(59, 66, 82, 0.45);
   --bg-hover: rgba(255, 255, 255, 0.04);
-  
-  --primary: #8b5cf6;
-  --primary-glow: rgba(139, 92, 246, 0.3);
-  --accent: #d946ef;
-  --accent-glow: rgba(217, 70, 239, 0.3);
-  
+
+  --primary: #34d399;
+  --primary-glow: rgba(52, 211, 153, 0.3);
+  --accent: #2dd4bf;
+  --accent-glow: rgba(45, 212, 191, 0.3);
+
   /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
-  --gradient-hover: linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #c084fc 100%);
-  --gradient-dark: linear-gradient(180deg, #13131a 0%, #08080a 100%);
-  
+  --gradient-primary: linear-gradient(135deg, #2dd4bf 0%, #34d399 50%, #4ade80 100%);
+  --gradient-hover: linear-gradient(135deg, #26b8a6 0%, #2cba85 50%, #3fc46e 100%);
+  --gradient-dark: linear-gradient(180deg, #2e3440 0%, #242933 100%);
+
   /* Text */
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-success: #10b981;
-  --text-error: #f43f5e;
-  
+  --text-primary: #eceff4;
+  --text-secondary: #abb2c0;
+  --text-muted: #6c7689;
+  --text-success: #34d399;
+  --text-error: #bf616a;
+
   /* Borders and Shadows */
   --border-color: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(139, 92, 246, 0.5);
+  --border-focus: rgba(52, 211, 153, 0.5);
   --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(139, 92, 246, 0.15);
+  --shadow-glow: 0 0 20px rgba(52, 211, 153, 0.15);
   
   --radius-sm: 8px;
   --radius-md: 12px;
