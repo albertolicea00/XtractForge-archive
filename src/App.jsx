@@ -516,38 +516,48 @@ export default function App() {
         {/* ── TAB: Download ───────────────────────────────────────────────── */}
         {activeTab === 'download' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div className="glass-card">
-              <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>Analyze Media URL</h2>
-              <form onSubmit={handleAnalyze}>
-                <div className="input-group">
-                  <label htmlFor="url-input">
-                    URL — YouTube, Spotify, Bilibili, DeviantArt, and more
-                    {detectedPlugin && pluginStatus[detectedPlugin] && (
-                      <span style={{ marginLeft: '8px', color: 'var(--primary)', fontSize: '11px' }}>
-                        {pluginStatus[detectedPlugin].icon} via {pluginStatus[detectedPlugin].name}
-                      </span>
-                    )}
-                  </label>
-                  <div className="input-container">
-                    <input
-                      id="url-input"
-                      type="text"
-                      placeholder="https://..."
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      disabled={analyzing}
-                    />
-                    <button type="submit" className="input-icon-btn" disabled={analyzing || !url.trim()}>
-                      {analyzing ? <RefreshCw className="spinner" size={20} /> : <Search size={20} />}
-                    </button>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                  <button type="submit" className="btn btn-primary" disabled={analyzing || !url.trim()}>
-                    {analyzing ? <><RefreshCw className="spinner" size={16} /> Analyzing...</> : <><Search size={16} /> Analyze</>}
+            <div className="glass-card" style={{ padding: '56px 32px', textAlign: 'center' }}>
+              <h1 style={{ fontSize: '46px', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.05 }}>Extract Anything.</h1>
+              <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginTop: '12px' }}>
+                Paste a URL to start media extraction — XtractForge auto-detects the right tool.
+              </p>
+
+              <form onSubmit={handleAnalyze} style={{ maxWidth: '680px', margin: '28px auto 0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', padding: '8px 8px 8px 18px' }}>
+                  <input
+                    id="url-input"
+                    type="text"
+                    placeholder="https://vimeo.com/724103…"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    disabled={analyzing}
+                    style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', outline: 'none', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '16px' }}
+                  />
+                  <button type="submit" className="btn btn-primary" disabled={analyzing || !url.trim()} style={{ flexShrink: 0, fontSize: '15px', padding: '12px 28px' }}>
+                    {analyzing ? <><RefreshCw className="spinner" size={16} /> Extracting…</> : <>Extract</>}
                   </button>
                 </div>
               </form>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '20px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-success)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', padding: '6px 14px' }}>
+                  ● Auto-detect enabled
+                </span>
+                <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: availableDownloaders.length ? 'var(--text-secondary)' : 'var(--text-error)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', padding: '6px 14px' }}>
+                  Plugins active: {availableDownloaders.length}
+                </span>
+                {detectedPlugin && pluginStatus[detectedPlugin] && (
+                  <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', padding: '6px 14px' }}>
+                    {pluginStatus[detectedPlugin].icon} via {pluginStatus[detectedPlugin].name}
+                  </span>
+                )}
+              </div>
+
+              {availableDownloaders.length === 0 && !checkingDeps && (
+                <p style={{ fontSize: '12px', color: 'var(--text-error)', marginTop: '16px' }}>
+                  No tools installed or enabled. Open the <strong>Plugins</strong> tab to install or enable one before extracting.
+                </p>
+              )}
             </div>
 
             {analysisError && (
