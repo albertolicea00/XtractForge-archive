@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   getDefaultDownloadsFolder: () => ipcRenderer.invoke('get-default-downloads-folder'),
   openFolder: (p) => ipcRenderer.invoke('open-folder', p),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   // Media info & download
   getVideoInfo: (url) => ipcRenderer.invoke('get-video-info', url),

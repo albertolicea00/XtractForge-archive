@@ -10,6 +10,7 @@ const HANDLED_SITES = [
 module.exports = {
   id: 'lux',
   name: 'Lux',
+  order: 4,
   description: 'Fast media downloader for Bilibili, Douyin, Kuaishou, and more',
   type: 'downloader',
   icon: '⚡',

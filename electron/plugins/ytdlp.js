@@ -6,6 +6,7 @@ const progressRegex = /\[download\]\s+([\d.]+)% of\s+(?:~\s*)?([\d.]+\w+) at\s+(
 module.exports = {
   id: 'yt-dlp',
   name: 'yt-dlp',
+  order: 1,   // display order in the Plugins tab (routing order is separate)
   description: 'Download from YouTube, Vimeo, Twitter/X, TikTok, and 1000+ sites',
   type: 'downloader',
   icon: '▶',

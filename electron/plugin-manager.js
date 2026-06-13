@@ -114,6 +114,7 @@ function checkAllDependencies(globalConfig) {
     result[plugin.id] = {
       ...status,
       name: plugin.name,
+      order: typeof plugin.order === 'number' ? plugin.order : 99,
       description: plugin.description,
       type: plugin.type,
       icon: plugin.icon || '🔌',

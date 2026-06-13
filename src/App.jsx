@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Download, ListOrdered, Settings as SettingsIcon, Folder, Play,
   CheckCircle2, AlertTriangle, Trash2, Sliders, Search,
-  Clock, User, FileVideo, Music, XCircle, ExternalLink, ChevronRight,
+  Clock, User, FileVideo, Music, XCircle, ChevronRight,
   RefreshCw, HardDrive, Puzzle, Zap, ToggleLeft, ToggleRight,
-  UploadCloud, FolderOpen, Palette, Check, Copy, ShieldAlert,
+  UploadCloud, FolderOpen, Palette, Check, Copy, ShieldAlert, Globe,
 } from 'lucide-react';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -166,6 +166,8 @@ export default function App() {
   const [importResult, setImportResult] = useState(null);
   // Tracks which plugin's install command was just copied (for "Copied!" feedback)
   const [copiedInstall, setCopiedInstall] = useState(null);
+  // Which plugin's settings section is expanded in the Settings tab (null = all collapsed)
+  const [expandedPlugin, setExpandedPlugin] = useState(null);
 
   // Themes
   const [themes, setThemes] = useState([]);
@@ -367,6 +369,18 @@ export default function App() {
     }
   };
 
+  // Jump to Settings tab with this plugin's section expanded and scrolled into view
+  const goToPluginSettings = (id) => {
+    setExpandedPlugin(id);
+    setActiveTab('settings');
+    setTimeout(() => {
+      const el = document.getElementById(`plugin-settings-${id}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  };
+
+  const togglePluginSettings = (id) => setExpandedPlugin(prev => (prev === id ? null : id));
+
   const handleSaveSettings = async () => {
     await window.api.saveSettings(settings);
     await window.api.savePluginConfigs(pluginConfigs);
@@ -400,7 +414,9 @@ export default function App() {
     .filter(([, p]) => p.type === 'downloader' && p.available)
     .map(([id, p]) => ({ id, ...p }));
 
-  const downloaderPlugins = Object.entries(pluginStatus).filter(([, p]) => p.type === 'downloader');
+  const downloaderPlugins = Object.entries(pluginStatus)
+    .filter(([, p]) => p.type === 'downloader')
+    .sort((a, b) => (a[1].order ?? 99) - (b[1].order ?? 99));
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -807,13 +823,18 @@ export default function App() {
                           <span style={{ fontSize: '11px', color: plugin.available ? 'var(--text-success)' : 'var(--text-error)' }}>
                             {plugin.available ? `● v${plugin.version}` : '○ not found'}
                           </span>
+                          {plugin.repoUrl && (
+                            <button
+                              onClick={() => window.api.openExternal(plugin.repoUrl)}
+                              title={plugin.repoUrl}
+                              aria-label="Open project website"
+                              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
+                            >
+                              <Globe size={14} />
+                            </button>
+                          )}
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{plugin.description}</div>
-                        {plugin.repoUrl && (
-                          <a href="#" onClick={(e) => { e.preventDefault(); }} style={{ fontSize: '11px', color: 'var(--primary)', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <ExternalLink size={10} /> {plugin.repoUrl}
-                          </a>
-                        )}
                         {!plugin.available && resolveInstall(plugin, window.api.platform) && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Install</span>
@@ -830,24 +851,41 @@ export default function App() {
                           </div>
                         )}
                       </div>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '8px 12px', fontSize: '12px' }}
-                        onClick={() => handleTogglePlugin(id, enabled)}
-                      >
-                        {enabled ? <><ToggleRight size={14} style={{ color: 'var(--primary)' }} /> Enabled</> : <><ToggleLeft size={14} /> Disabled</>}
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {plugin.configSchema && plugin.configSchema.length > 0 && (
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '8px 10px', fontSize: '12px' }}
+                            onClick={() => goToPluginSettings(id)}
+                            title={`${plugin.name} settings`}
+                            aria-label={`${plugin.name} settings`}
+                          >
+                            <Sliders size={14} />
+                          </button>
+                        )}
+                        <button
+                          className="btn btn-secondary"
+                          style={{ padding: '8px 12px', fontSize: '12px' }}
+                          onClick={() => handleTogglePlugin(id, enabled)}
+                        >
+                          {enabled ? <><ToggleRight size={14} style={{ color: 'var(--primary)' }} /> Enabled</> : <><ToggleLeft size={14} /> Disabled</>}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Building a plugin</h4>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  A plugin is a single <code>.js</code> file exporting: <code>{'{ id, name, description, type, repoUrl, icon, configSchema, checkDependency, canHandle, getInfo, buildDownloadArgs, parseProgress }'}</code>.
-                  Drop it in the Plugins Folder or use Import Plugin. See <code>electron/plugins/ytdlp.js</code> as a reference.
-                </p>
+              <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+                <div>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Building a plugin</h4>
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Plugins are single <code>.js</code> files. The full API reference and examples live on GitHub.
+                  </p>
+                </div>
+                <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => window.api.openExternal('https://github.com/albertolicea00/XtractForge/blob/main/ADDONS.md')}>
+                  <Globe size={14} /> Plugin docs
+                </button>
               </div>
             </div>
           </div>
@@ -1009,13 +1047,16 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-              <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Building a theme</h4>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                A theme is a single <code>.js</code> file exporting: <code>{'{ id, name, description, author, mode, swatches, variables, css? }'}</code>.
-                <code>variables</code> is a map of CSS custom properties (e.g. <code>{"'--primary': '#8b5cf6'"}</code>) applied to <code>:root</code>.
-                Drop it in the Themes Folder or use Import Theme. See <code>electron/themes/cyber-glass.js</code> as a reference.
-              </p>
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+              <div>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Building a theme</h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Themes are single <code>.js</code> files mapping CSS variables. The full authoring guide lives on GitHub.
+                </p>
+              </div>
+              <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => window.api.openExternal('https://github.com/albertolicea00/XtractForge/blob/main/ADDONS.md#themes')}>
+                <Globe size={14} /> Theme docs
+              </button>
             </div>
           </div>
         )}
@@ -1068,38 +1109,55 @@ export default function App() {
               </div>
             </div>
 
-            {/* Per-plugin settings */}
+            {/* Per-plugin settings — collapsed by default, expand on click or via a plugin's Settings button */}
             {Object.entries(pluginStatus).map(([id, plugin]) => {
               if (!plugin.configSchema || plugin.configSchema.length === 0) return null;
               const cfg = pluginConfigs[id] || {};
+              const expanded = expandedPlugin === id;
               return (
-                <div key={id} className="glass-card">
-                  <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span>{plugin.icon}</span> {plugin.name} Settings
+                <div key={id} id={`plugin-settings-${id}`} className="glass-card" style={{ scrollMarginTop: '16px', padding: expanded ? '24px' : '16px 24px' }}>
+                  <div
+                    onClick={() => togglePluginSettings(id)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    <ChevronRight size={16} style={{ color: 'var(--text-muted)', transform: expanded ? 'rotate(90deg)' : 'none', transition: 'var(--transition-fast)' }} />
+                    <span style={{ fontSize: '18px' }}>{plugin.icon}</span>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600 }}>{plugin.name} Settings</h3>
                     <span style={{ fontSize: '11px', color: plugin.available ? 'var(--text-success)' : 'var(--text-error)', fontWeight: 400 }}>
                       {plugin.available ? '● installed' : '○ not installed'}
                     </span>
-                  </h3>
-                  {plugin.repoUrl && <div style={{ fontSize: '11px', color: 'var(--primary)', marginBottom: '16px' }}>{plugin.repoUrl}</div>}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {plugin.configSchema.map(field => (
-                      <div key={field.key} className="input-group" style={{ marginBottom: 0 }}>
-                        <label>{field.label}</label>
-                        {field.type === 'toggle' ? (
-                          <label className="switch">
-                            <input type="checkbox" checked={!!(cfg[field.key] ?? field.default)} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.checked } }))} />
-                            <span className="slider"></span>
-                          </label>
-                        ) : field.type === 'select' ? (
-                          <select value={cfg[field.key] ?? field.default} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.value } }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
-                            {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                          </select>
-                        ) : (
-                          <input type="text" placeholder={field.placeholder || ''} value={cfg[field.key] ?? field.default ?? ''} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.value } }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
-                        )}
-                      </div>
-                    ))}
+                    {plugin.repoUrl && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); window.api.openExternal(plugin.repoUrl); }}
+                        title={plugin.repoUrl}
+                        aria-label="Open project website"
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px', display: 'inline-flex', alignItems: 'center' }}
+                      >
+                        <Globe size={14} />
+                      </button>
+                    )}
                   </div>
+                  {expanded && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+                      {plugin.configSchema.map(field => (
+                        <div key={field.key} className="input-group" style={{ marginBottom: 0 }}>
+                          <label>{field.label}</label>
+                          {field.type === 'toggle' ? (
+                            <label className="switch">
+                              <input type="checkbox" checked={!!(cfg[field.key] ?? field.default)} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.checked } }))} />
+                              <span className="slider"></span>
+                            </label>
+                          ) : field.type === 'select' ? (
+                            <select value={cfg[field.key] ?? field.default} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.value } }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
+                              {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          ) : (
+                            <input type="text" placeholder={field.placeholder || ''} value={cfg[field.key] ?? field.default ?? ''} onChange={(e) => setPluginConfigs(prev => ({ ...prev, [id]: { ...(prev[id] || {}), [field.key]: e.target.value } }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

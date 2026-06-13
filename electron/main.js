@@ -267,6 +267,13 @@ ipcMain.handle('cancel-download', (event, downloadId) => {
   return false;
 });
 
+// Open an external URL in the default browser
+ipcMain.handle('open-external', async (event, targetUrl) => {
+  if (typeof targetUrl !== 'string' || !/^https?:\/\//i.test(targetUrl)) return false;
+  await shell.openExternal(targetUrl);
+  return true;
+});
+
 // Open folder in OS file explorer
 ipcMain.handle('open-folder', async (event, folderPath) => {
   try {
