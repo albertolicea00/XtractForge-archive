@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
   // Media info & download
-  getVideoInfo: (url) => ipcRenderer.invoke('get-video-info', url),
+  getVideoInfo: (url, pluginId) => ipcRenderer.invoke('get-video-info', url, pluginId),
   startDownload: (downloadId, url, options) => ipcRenderer.invoke('start-download', downloadId, url, options),
   cancelDownload: (downloadId) => ipcRenderer.invoke('cancel-download', downloadId),
   pauseDownload: (downloadId) => ipcRenderer.invoke('pause-download', downloadId),

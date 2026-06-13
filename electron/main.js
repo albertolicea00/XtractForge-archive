@@ -142,9 +142,10 @@ ipcMain.handle('select-folder', async () => {
 
 ipcMain.handle('get-default-downloads-folder', () => config.downloadFolder);
 
-// Get video/media info — routes to best plugin for the URL
-ipcMain.handle('get-video-info', async (event, url) => {
-  const plugin = pluginManager.getDownloaderForUrl(url, config.disabledPlugins || []);
+// Get video/media info — auto-routes to the best plugin, or uses a forced one
+ipcMain.handle('get-video-info', async (event, url, forcedPluginId) => {
+  const forced = forcedPluginId && forcedPluginId !== 'auto' ? pluginManager.getPlugin(forcedPluginId) : null;
+  const plugin = forced || pluginManager.getDownloaderForUrl(url, config.disabledPlugins || []);
   const pluginCfg = pluginManager.getPluginConfig(plugin.id, config);
   const result = await plugin.getInfo(url, pluginCfg);
   // Inject which plugin handled this so the renderer can display it

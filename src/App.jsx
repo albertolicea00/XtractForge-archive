@@ -162,6 +162,8 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState(null);
   const [videoInfo, setVideoInfo] = useState(null);
   const [detectedPlugin, setDetectedPlugin] = useState(null);
+  // Which engine to extract with: 'auto' (let XtractForge pick) or a plugin id
+  const [chosenEngine, setChosenEngine] = useState('auto');
 
   // Format selection
   const [downloadType, setDownloadType] = useState('video');
@@ -314,7 +316,7 @@ export default function App() {
     setDetectedPlugin(null);
 
     try {
-      const response = await window.api.getVideoInfo(target);
+      const response = await window.api.getVideoInfo(target, chosenEngine);
       if (response.success) {
         setVideoInfo(response.data);
         setDetectedPlugin(response.pluginId || 'yt-dlp');
@@ -608,6 +610,21 @@ export default function App() {
                   <button type="submit" className="btn btn-primary" disabled={analyzing || !url.trim()} style={{ flexShrink: 0, fontSize: '15px', padding: '12px 28px' }}>
                     {analyzing ? <><RefreshCw className="spinner" size={16} /> Extracting…</> : <>Extract</>}
                   </button>
+                </div>
+
+                {/* Engine picker — default Auto lets XtractForge choose the best tool */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '14px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Engine</span>
+                  <select
+                    value={chosenEngine}
+                    onChange={(e) => setChosenEngine(e.target.value)}
+                    style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '6px 10px', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="auto">Auto-detect (recommended)</option>
+                    {downloaderPlugins.filter(([id]) => !disabledPlugins.includes(id)).map(([id, p]) => (
+                      <option key={id} value={id}>{p.name}</option>
+                    ))}
+                  </select>
                 </div>
               </form>
 
