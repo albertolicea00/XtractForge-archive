@@ -86,8 +86,6 @@ body {
   width: 100vw;
   overflow: hidden;
   position: relative;
-  /* Top padding leaves room for the draggable titlebar + macOS traffic lights */
-  padding-top: 38px;
 }
 
 /* Draggable titlebar strip — lets the frameless/hiddenInset window be moved by
@@ -146,6 +144,7 @@ button, a, input, select, textarea, .nav-item, .switch {
   z-index: 10;
   flex-shrink: 0;
   backdrop-filter: blur(20px);
+  padding-top: 48px;
 }
 
 .brand {
