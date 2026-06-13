@@ -72,7 +72,7 @@ module.exports = {
   id: 'my-tool',
   name: 'My Tool',
   description: 'Downloads from example.com',
-  type: 'downloader',       // 'downloader' | 'searcher'
+  type: 'downloader',
   icon: '🔧',
   repoUrl: 'https://github.com/org/my-tool',
   installHint: 'pip install my-tool',
@@ -106,3 +106,45 @@ module.exports = {
 ```
 
 See [electron/plugins/ytdlp.js](electron/plugins/ytdlp.js) for a full reference implementation.
+
+---
+
+## Themes
+
+Themes are installed exactly like plugins — single `.js` files dropped in the themes folder or imported from the **Themes tab**. A theme is pure data (CSS variables), so nothing executes from it.
+
+### Built-in Themes
+
+| Theme | Mode | Look |
+|---|---|---|
+| 🟣 **Cyber-Glass** (default) | Dark | Glassmorphic dark utility, violet accents |
+| 📜 **Alexandria** | Light | Scholarly light editorial, warm gold accent |
+| 🟢 **Matrix** | Dark | High-contrast terminal, phosphor green, mono font |
+
+From the Themes tab you can also override the accent color, tune glass intensity, and toggle a monospace UI font — these layer on top of any theme.
+
+### Writing a Theme
+
+```js
+module.exports = {
+  id: 'my-theme',
+  name: 'My Theme',
+  description: 'A short tagline',
+  author: 'you',
+  mode: 'dark',                          // 'dark' | 'light'
+  swatches: ['#8b5cf6', '#d946ef', '#16161d'],  // 3 preview dots
+
+  // CSS custom properties applied to :root (see src/index.css for the full list)
+  variables: {
+    '--primary': '#8b5cf6',
+    '--bg-deep': '#08080a',
+    '--bg-card': 'rgba(22, 22, 29, 0.7)',
+    '--text-primary': '#f8fafc',
+    // ...
+  },
+
+  css: '',  // optional raw CSS appended after the :root block
+};
+```
+
+Install: drop it in the Themes Folder (**Themes tab → Themes Folder**) or click **Import Theme**. See [electron/themes/cyber-glass.js](electron/themes/cyber-glass.js) for a full reference.

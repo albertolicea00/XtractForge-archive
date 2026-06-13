@@ -121,6 +121,55 @@ Disabled plugins (in `config.disabledPlugins[]`) are skipped.
 
 ---
 
+## Theme System
+
+Themes mirror the plugin model: built-in themes ship with the app, community themes are importable `.js` files. A theme is pure data — CSS custom properties — so no logic runs from a theme file.
+
+### Theme Interface
+
+Every theme is a CommonJS module (`module.exports = { ... }`):
+
+```js
+{
+  id: string,            // unique, kebab-case (e.g. 'cyber-glass')
+  name: string,          // display name
+  description: string,
+  author: string,        // shown as a badge for community themes
+  repoUrl: string,       // optional
+  mode: 'dark' | 'light',
+  swatches: string[],    // 3 preview dots (hex) shown on the theme card
+  variables: {           // CSS custom properties applied to :root
+    '--primary': string,
+    '--bg-deep': string,
+    // ...any of the vars defined in src/index.css :root
+  },
+  css?: string,          // optional raw CSS appended after the :root block
+}
+```
+
+### Theme Manager (`electron/theme-manager.js`)
+
+| Export | Description |
+|---|---|
+| `getTheme(id)` | Lookup by id |
+| `getAllThemes()` | Serializable metadata for every registered theme (incl. `variables`, `css`, `isBuiltin`) |
+| `loadExternalThemes(dir)` | Loads all `.js` files from a directory into the registry |
+| `loadThemeFile(filePath)` | Loads a single `.js` file into the registry |
+
+Built-in themes (registered at load): `cyber-glass` (default) → `alexandria` → `matrix`. External themes load from `<userData>/themes/` in `initThemes()` at window creation.
+
+### Theme Application (renderer)
+
+`src/App.jsx` injects a `<style id="xf-theme">` element holding a `:root { ... }` block built from `theme.variables`. Three user settings are layered on top before injection (see `buildThemeCss`):
+
+- **accentOverride** — recolors `--primary`, `--accent`, glows, focus border, and gradients from one hex.
+- **glassIntensity** (0–100) — remaps the alpha of `--bg-card` / `--bg-panel` (higher = more translucent).
+- **monoFont** — swaps `--font-sans` for a monospace stack.
+
+Because the injected `:root` block comes after `index.css`, it wins on equal specificity. `index.css :root` remains the fallback (matches `cyber-glass`).
+
+---
+
 ## IPC API
 
 All IPC is invoked via `window.api` in the renderer.
@@ -143,6 +192,13 @@ All IPC is invoked via `window.api` in the renderer.
 | `importPluginFile(path)` | `path: string` | `Promise<{id, success, error}>` | Load plugin from path |
 | `browsePluginFile()` | — | `Promise<{id, success, error} \| null>` | File picker + load |
 | `openPluginsDir()` | — | `Promise<string>` | Open `<userData>/plugins/` |
+| `getThemes()` | — | `Promise<Theme[]>` | All registered themes (metadata + variables) |
+| `getActiveTheme()` | — | `Promise<{ activeTheme, themeSettings }>` | Active theme id + user theme settings |
+| `setActiveTheme(id)` | `id: string` | `Promise<boolean>` | Switch active theme |
+| `saveThemeSettings(s)` | `s: object` | `Promise<boolean>` | Save `{ accentOverride, glassIntensity, monoFont }` |
+| `importThemeFile(path)` | `path: string` | `Promise<{id, success, error}>` | Load theme from path |
+| `browseThemeFile()` | — | `Promise<{id, success, error} \| null>` | File picker + load |
+| `openThemesDir()` | — | `Promise<string>` | Open `<userData>/themes/` |
 
 ### IPC Events (push from main → renderer)
 
@@ -166,6 +222,9 @@ window.api.onDownloadError(({ downloadId, status, error }) => {})
   "sponsorBlock": false,
   "disabledPlugins": [],
   "externalPluginsDir": "<userData>/plugins",
+  "activeTheme": "cyber-glass",
+  "themeSettings": { "accentOverride": "", "glassIntensity": 75, "monoFont": false },
+  "externalThemesDir": "<userData>/themes",
   "plugins": {
     "lux":         { "luxPath": "lux", "luxMultiThread": false },
     "gallery-dl":  { "galleryDlPath": "gallery-dl", "galleryDlCookies": "" },
@@ -199,11 +258,21 @@ pnpm package:all
 
 ---
 
+## Adding a New Built-in Theme
+
+1. Create `electron/themes/<name>.js` exporting `{ id, name, description, author, mode, swatches, variables }`
+2. `require` it in `electron/theme-manager.js` and add it to `BUILTIN_THEMES`
+3. Define `variables` covering the color/bg/text/border/gradient/shadow vars from `src/index.css :root`
+4. Verify it renders by selecting it in the Themes tab
+
+---
+
 ## Roadmap
 
 - Auto-download missing binaries (yt-dlp, ffmpeg) on first run
 - Plugin marketplace / registry (browse and install community plugins from a URL)
+- Theme marketplace / registry (browse and install community themes from a URL)
 - Batch URL input (newline-separated)
 - Download history persistence across restarts
 - Chapter selector for YouTube videos with chapters
-- Light/dark theme toggle
+- Follow OS light/dark preference automatically

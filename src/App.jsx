@@ -4,7 +4,7 @@ import {
   CheckCircle2, AlertTriangle, Trash2, Sliders, Search,
   Clock, User, FileVideo, Music, XCircle, ExternalLink, ChevronRight,
   RefreshCw, HardDrive, Puzzle, Zap, ToggleLeft, ToggleRight,
-  UploadCloud, FolderOpen,
+  UploadCloud, FolderOpen, Palette, Check,
 } from 'lucide-react';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -35,6 +35,84 @@ function formatBytes(bytes, decimals = 2) {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals < 0 ? 0 : decimals)) + ' ' + sizes[i];
 }
+
+// ─── theme application ────────────────────────────────────────────────────────
+// A theme is { variables: { '--x': value } } + optional raw `css`. We inject a
+// <style id="xf-theme"> with a :root block. User settings (accent, glass, mono)
+// are layered on top of the theme's own variables.
+
+const MONO_STACK = "'SFMono-Regular', 'JetBrains Mono', 'Fira Code', Consolas, monospace";
+
+function hexToRgba(hex, alpha) {
+  if (typeof hex !== 'string') return null;
+  const h = hex.trim().replace('#', '');
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  if (full.length !== 6) return null;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  if ([r, g, b].some(Number.isNaN)) return null;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Extract [r,g,b] from an rgb()/rgba()/#hex string, or null if unparseable.
+function parseRgb(str) {
+  if (typeof str !== 'string') return null;
+  const s = str.trim();
+  if (s.startsWith('#')) {
+    const rgba = hexToRgba(s, 1);
+    if (!rgba) return null;
+    str = rgba;
+  }
+  const m = str.match(/rgba?\(([^)]+)\)/);
+  if (!m) return null;
+  const parts = m[1].split(',').map(n => parseFloat(n));
+  if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
+  return [parts[0], parts[1], parts[2]];
+}
+
+function buildThemeCss(theme, settings = {}) {
+  const vars = { ...(theme.variables || {}) };
+
+  // Glass intensity (0–100): higher = more translucent glass surfaces.
+  const intensity = typeof settings.glassIntensity === 'number' ? settings.glassIntensity : 75;
+  const alpha = Math.max(0.15, Math.min(1, 1 - (intensity / 100) * 0.6));
+  for (const key of ['--bg-card', '--bg-panel']) {
+    const rgb = parseRgb(vars[key]);
+    if (rgb) vars[key] = `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha.toFixed(3)})`;
+  }
+
+  // Accent override: recolor primary/accent + gradients from one hex.
+  const accent = (settings.accentOverride || '').trim();
+  if (accent && hexToRgba(accent, 1)) {
+    vars['--primary'] = accent;
+    vars['--accent'] = accent;
+    vars['--primary-glow'] = hexToRgba(accent, 0.3);
+    vars['--accent-glow'] = hexToRgba(accent, 0.3);
+    vars['--border-focus'] = hexToRgba(accent, 0.5);
+    vars['--gradient-primary'] = `linear-gradient(135deg, ${accent} 0%, ${accent} 100%)`;
+    vars['--gradient-hover'] = `linear-gradient(135deg, ${accent} 0%, ${accent} 100%)`;
+  }
+
+  // Mono font toggle.
+  if (settings.monoFont) vars['--font-sans'] = MONO_STACK;
+
+  const body = Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join('\n');
+  return `:root {\n${body}\n}\n${theme.css || ''}`;
+}
+
+function applyTheme(theme, settings) {
+  if (!theme) return;
+  let el = document.getElementById('xf-theme');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'xf-theme';
+    document.head.appendChild(el);
+  }
+  el.textContent = buildThemeCss(theme, settings);
+}
+
+const ACCENT_PRESETS = ['#adc6ff', '#ff8a80', '#34d399', '#c4b5fd', '#fbbf24'];
 
 // ─── App ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +156,12 @@ export default function App() {
   // Import plugin feedback
   const [importResult, setImportResult] = useState(null);
 
+  // Themes
+  const [themes, setThemes] = useState([]);
+  const [activeThemeId, setActiveThemeId] = useState('cyber-glass');
+  const [themeSettings, setThemeSettings] = useState({ accentOverride: '', glassIntensity: 75, monoFont: false });
+  const [themeImportResult, setThemeImportResult] = useState(null);
+
   // ── Init ──────────────────────────────────────────────────────────────────
 
   const refreshPlugins = useCallback(async () => {
@@ -96,8 +180,21 @@ export default function App() {
     }
   }, []);
 
+  const loadThemes = useCallback(async () => {
+    try {
+      const list = await window.api.getThemes();
+      setThemes(list);
+      const active = await window.api.getActiveTheme();
+      setActiveThemeId(active.activeTheme || 'cyber-glass');
+      if (active.themeSettings) setThemeSettings(active.themeSettings);
+    } catch (err) {
+      console.error('Failed to load themes:', err);
+    }
+  }, []);
+
   useEffect(() => {
     refreshPlugins();
+    loadThemes();
 
     const unsub1 = window.api.onDownloadProgress((data) => {
       setQueue(prev => prev.map(item =>
@@ -120,7 +217,13 @@ export default function App() {
     });
 
     return () => { unsub1(); unsub2(); unsub3(); };
-  }, [refreshPlugins]);
+  }, [refreshPlugins, loadThemes]);
+
+  // Apply the active theme + user settings whenever any of them change
+  useEffect(() => {
+    const theme = themes.find(t => t.id === activeThemeId);
+    if (theme) applyTheme(theme, themeSettings);
+  }, [themes, activeThemeId, themeSettings]);
 
   // ── Download tab ──────────────────────────────────────────────────────────
 
@@ -249,6 +352,27 @@ export default function App() {
     await refreshPlugins();
   };
 
+  // ── Theme management ──────────────────────────────────────────────────────
+
+  const handleSetTheme = async (themeId) => {
+    setActiveThemeId(themeId);
+    await window.api.setActiveTheme(themeId);
+  };
+
+  const handleThemeSetting = async (patch) => {
+    const next = { ...themeSettings, ...patch };
+    setThemeSettings(next);
+    await window.api.saveThemeSettings(next);
+  };
+
+  const handleImportTheme = async () => {
+    setThemeImportResult(null);
+    const result = await window.api.browseThemeFile();
+    if (!result) return;
+    setThemeImportResult(result);
+    if (result.success) await loadThemes();
+  };
+
   // ── Active plugins for sidebar ────────────────────────────────────────────
 
   const availableDownloaders = Object.entries(pluginStatus)
@@ -256,7 +380,6 @@ export default function App() {
     .map(([id, p]) => ({ id, ...p }));
 
   const downloaderPlugins = Object.entries(pluginStatus).filter(([, p]) => p.type === 'downloader');
-  const searcherPlugins = Object.entries(pluginStatus).filter(([, p]) => p.type === 'searcher');
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -277,6 +400,7 @@ export default function App() {
             { id: 'download', icon: <Download />, label: 'Download' },
             { id: 'queue', icon: <ListOrdered />, label: `Queue (${queue.length})` },
             { id: 'plugins', icon: <Puzzle />, label: 'Plugins' },
+            { id: 'themes', icon: <Palette />, label: 'Themes' },
             { id: 'settings', icon: <SettingsIcon />, label: 'Settings' },
           ].map(({ id, icon, label }) => (
             <li
@@ -675,46 +799,6 @@ export default function App() {
                 })}
               </div>
 
-              {/* Searcher plugins */}
-              <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px' }}>AI / Discovery</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {searcherPlugins.map(([id, plugin]) => {
-                  const enabled = !disabledPlugins.includes(id);
-                  return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', background: 'var(--bg-hover)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', opacity: enabled ? 1 : 0.5 }}>
-                      <div style={{ fontSize: '24px' }}>{plugin.icon}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontWeight: 600, fontSize: '14px' }}>{plugin.name}</span>
-                          {plugin.isBuiltin && <span style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary)', borderRadius: '10px' }}>built-in</span>}
-                          <span style={{ fontSize: '11px', color: plugin.available ? 'var(--text-success)' : 'var(--text-error)' }}>
-                            {plugin.available ? `● ${plugin.version}` : '○ not running'}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{plugin.description}</div>
-                        {plugin.repoUrl && (
-                          <div style={{ fontSize: '11px', color: 'var(--primary)', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                            <ExternalLink size={10} /> {plugin.repoUrl}
-                          </div>
-                        )}
-                        {!plugin.available && plugin.installHint && (
-                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                            {plugin.installHint}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '8px 12px', fontSize: '12px' }}
-                        onClick={() => handleTogglePlugin(id, enabled)}
-                      >
-                        {enabled ? <><ToggleRight size={14} style={{ color: 'var(--primary)' }} /> Enabled</> : <><ToggleLeft size={14} /> Disabled</>}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-
               <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Building a plugin</h4>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
@@ -722,6 +806,173 @@ export default function App() {
                   Drop it in the Plugins Folder or use Import Plugin. See <code>electron/plugins/ytdlp.js</code> as a reference.
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB: Themes ─────────────────────────────────────────────────── */}
+        {activeTab === 'themes' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div className="glass-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Palette size={20} style={{ color: 'var(--primary)' }} /> Themes
+                  </h2>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                    Personalize your workspace. Import community themes (.js files exporting CSS variables).
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button className="btn btn-secondary" onClick={() => window.api.openThemesDir()} style={{ fontSize: '13px', padding: '8px 14px' }}>
+                    <FolderOpen size={14} /> Themes Folder
+                  </button>
+                  <button className="btn btn-primary" onClick={handleImportTheme} style={{ fontSize: '13px', padding: '8px 14px' }}>
+                    <UploadCloud size={14} /> Import Theme
+                  </button>
+                </div>
+              </div>
+
+              {themeImportResult && (
+                <div className="error-banner" style={{ marginTop: '16px', marginBottom: 0, borderColor: themeImportResult.success ? 'var(--text-success)' : undefined }}>
+                  {themeImportResult.success ? <CheckCircle2 size={18} style={{ color: 'var(--text-success)' }} /> : <AlertTriangle size={18} />}
+                  <div>
+                    <strong>{themeImportResult.success ? `Theme "${themeImportResult.id}" imported` : 'Import failed'}</strong>
+                    {!themeImportResult.success && <p style={{ fontSize: '12px', marginTop: '2px' }}>{themeImportResult.error}</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Visual Modes */}
+              <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '24px 0 12px' }}>Visual Modes</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+                {themes.map(theme => {
+                  const active = theme.id === activeThemeId;
+                  return (
+                    <div
+                      key={theme.id}
+                      onClick={() => handleSetTheme(theme.id)}
+                      style={{
+                        cursor: 'pointer',
+                        borderRadius: 'var(--radius-md)',
+                        border: `1px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
+                        boxShadow: active ? '0 0 0 1px var(--primary), var(--shadow-glow)' : 'none',
+                        overflow: 'hidden',
+                        transition: 'var(--transition-fast)',
+                      }}
+                    >
+                      {/* Preview strip rendered from the theme's own colors */}
+                      <div style={{
+                        position: 'relative',
+                        height: '110px',
+                        padding: '14px',
+                        display: 'flex',
+                        alignItems: 'flex-end',
+                        gap: '6px',
+                        background: theme.variables['--bg-dark'] || theme.variables['--bg-deep'] || '#0f0f13',
+                        backgroundImage: theme.variables['--gradient-dark'] || 'none',
+                      }}>
+                        {active && (
+                          <div style={{ position: 'absolute', top: '10px', right: '10px', width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Check size={14} color="#fff" />
+                          </div>
+                        )}
+                        {(theme.swatches || []).map((c, i) => (
+                          <div key={i} style={{ width: '20px', height: '20px', borderRadius: '50%', background: c, border: '2px solid rgba(255,255,255,0.15)' }} />
+                        ))}
+                      </div>
+                      <div style={{ padding: '12px 14px', background: 'var(--bg-hover)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 600, fontSize: '14px' }}>{theme.name}</span>
+                          {theme.isBuiltin
+                            ? <span style={{ fontSize: '10px', padding: '1px 6px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary)', borderRadius: '10px' }}>built-in</span>
+                            : <span style={{ fontSize: '10px', padding: '1px 6px', background: 'var(--bg-input)', color: 'var(--text-muted)', borderRadius: '10px' }}>{theme.author || 'community'}</span>}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{theme.description}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Customization row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
+              <div className="glass-card">
+                <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>Custom Accent Color</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  Override the primary brand color across the entire interface.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+                    <input
+                      type="text"
+                      value={themeSettings.accentOverride || ''}
+                      placeholder="#8B5CF6"
+                      onChange={(e) => handleThemeSetting({ accentOverride: e.target.value })}
+                      style={{ width: '90px', background: 'none', border: 'none', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '14px', outline: 'none' }}
+                    />
+                    <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: themeSettings.accentOverride || 'var(--primary)', border: '1px solid var(--border-color)' }} />
+                  </div>
+                  {ACCENT_PRESETS.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => handleThemeSetting({ accentOverride: c })}
+                      aria-label={`Accent ${c}`}
+                      style={{
+                        width: '40px', height: '40px', borderRadius: '50%', background: c, cursor: 'pointer',
+                        border: (themeSettings.accentOverride || '').toLowerCase() === c.toLowerCase() ? '2px solid var(--text-primary)' : '2px solid transparent',
+                        boxShadow: (themeSettings.accentOverride || '').toLowerCase() === c.toLowerCase() ? `0 0 12px ${c}` : 'none',
+                      }}
+                    />
+                  ))}
+                  <button
+                    onClick={() => handleThemeSetting({ accentOverride: '' })}
+                    title="Reset to theme default"
+                    style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-hover)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <XCircle size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="glass-card">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600 }}>Glass Intensity</h3>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{themeSettings.glassIntensity}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={themeSettings.glassIntensity}
+                  onChange={(e) => handleThemeSetting({ glassIntensity: Number(e.target.value) })}
+                  style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                  <span>SOLID</span><span>FROSTED</span><span>TRANSLUCENT</span>
+                </div>
+              </div>
+
+              <div className="toggle-row">
+                <div className="toggle-details">
+                  <span className="toggle-title">Mono Font</span>
+                  <span className="toggle-desc">Technical metadata mode — render the whole UI in a monospace font.</span>
+                </div>
+                <label className="switch">
+                  <input type="checkbox" checked={!!themeSettings.monoFont} onChange={(e) => handleThemeSetting({ monoFont: e.target.checked })} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Building a theme</h4>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                A theme is a single <code>.js</code> file exporting: <code>{'{ id, name, description, author, mode, swatches, variables, css? }'}</code>.
+                <code>variables</code> is a map of CSS custom properties (e.g. <code>{"'--primary': '#8b5cf6'"}</code>) applied to <code>:root</code>.
+                Drop it in the Themes Folder or use Import Theme. See <code>electron/themes/cyber-glass.js</code> as a reference.
+              </p>
             </div>
           </div>
         )}

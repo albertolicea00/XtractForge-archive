@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld('api', {
   browsePluginFile: () => ipcRenderer.invoke('browse-plugin-file'),
   openPluginsDir: () => ipcRenderer.invoke('open-plugins-dir'),
 
+  // Theme management
+  getThemes: () => ipcRenderer.invoke('get-themes'),
+  getActiveTheme: () => ipcRenderer.invoke('get-active-theme'),
+  setActiveTheme: (themeId) => ipcRenderer.invoke('set-active-theme', themeId),
+  saveThemeSettings: (themeSettings) => ipcRenderer.invoke('save-theme-settings', themeSettings),
+  importThemeFile: (filePath) => ipcRenderer.invoke('import-theme-file', filePath),
+  browseThemeFile: () => ipcRenderer.invoke('browse-theme-file'),
+  openThemesDir: () => ipcRenderer.invoke('open-themes-dir'),
+
   // Download event listeners
   onDownloadProgress: (callback) => {
     const sub = (event, data) => callback(data);

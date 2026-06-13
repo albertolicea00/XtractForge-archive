@@ -28,8 +28,9 @@
 | 🎯 **Auto-detection** | Paste any URL; XtractForge picks the right plugin automatically |
 | 📊 **Download queue** | Real-time progress, speed, ETA, concurrent downloads, cancel |
 | 🎞️ **Format picker** | Quality presets, audio-only (MP3/M4A/WAV), or raw format selection |
-| ⚙️ **Per-plugin config** | Binary paths, cookies, bitrate, AI model — all configurable in Settings |
-| 🌑 **Dark UI** | Glassmorphic dark theme, native macOS/Windows/Linux window chrome |
+| ⚙️ **Per-plugin config** | Binary paths, cookies, bitrate — all configurable in Settings |
+| 🎨 **Themes** | Switch visual modes, override accent color, tune glass intensity; import community themes as `.js` files |
+| 🌑 **Glassmorphic UI** | Native macOS/Windows/Linux window chrome, light & dark built-in themes |
 
 ---
 

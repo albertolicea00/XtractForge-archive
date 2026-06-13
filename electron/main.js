@@ -3,6 +3,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const pluginManager = require('./plugin-manager');
+const themeManager = require('./theme-manager');
 
 let mainWindow;
 // activeDownloads stores { proc, pluginId } per downloadId
@@ -22,6 +23,11 @@ let config = {
   disabledPlugins: [],
   // Directory where user-installed external plugin .js files are stored
   externalPluginsDir: path.join(app.getPath('userData'), 'plugins'),
+  // Theming
+  activeTheme: 'cyber-glass',
+  themeSettings: { accentOverride: '', glassIntensity: 75, monoFont: false },
+  // Directory where user-installed external theme .js files are stored
+  externalThemesDir: path.join(app.getPath('userData'), 'themes'),
 };
 
 function loadConfig() {
@@ -52,9 +58,18 @@ function initPlugins() {
   }
 }
 
+function initThemes() {
+  const dir = config.externalThemesDir || path.join(app.getPath('userData'), 'themes');
+  const results = themeManager.loadExternalThemes(dir);
+  if (results.length > 0) {
+    console.log('[ThemeManager] External themes loaded:', results);
+  }
+}
+
 function createWindow() {
   loadConfig();
   initPlugins();
+  initThemes();
 
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -183,6 +198,59 @@ ipcMain.handle('browse-plugin-file', async () => {
 // Open the external plugins directory in Finder/Explorer
 ipcMain.handle('open-plugins-dir', async () => {
   const dir = config.externalPluginsDir || path.join(app.getPath('userData'), 'plugins');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  await shell.openPath(dir);
+  return dir;
+});
+
+// ── Themes ──────────────────────────────────────────────────────────────────
+
+// All registered themes (builtin + external) with their CSS variables
+ipcMain.handle('get-themes', () => themeManager.getAllThemes());
+
+// Active theme id + user theme settings (accent, glass intensity, mono font)
+ipcMain.handle('get-active-theme', () => ({
+  activeTheme: config.activeTheme || 'cyber-glass',
+  themeSettings: config.themeSettings || { accentOverride: '', glassIntensity: 75, monoFont: false },
+}));
+
+// Switch the active theme by id
+ipcMain.handle('set-active-theme', (event, themeId) => {
+  if (themeManager.getTheme(themeId)) {
+    config.activeTheme = themeId;
+    saveConfig();
+    return true;
+  }
+  return false;
+});
+
+// Persist user theme settings (accentOverride, glassIntensity, monoFont)
+ipcMain.handle('save-theme-settings', (event, themeSettings) => {
+  config.themeSettings = { ...(config.themeSettings || {}), ...themeSettings };
+  saveConfig();
+  return true;
+});
+
+// Import an external theme from an absolute file path
+ipcMain.handle('import-theme-file', (event, filePath) => {
+  return themeManager.loadThemeFile(filePath);
+});
+
+// Browse for an external theme file
+ipcMain.handle('browse-theme-file', async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import XtractForge Theme',
+    filters: [{ name: 'JavaScript Theme', extensions: ['js'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || result.filePaths.length === 0) return null;
+  return themeManager.loadThemeFile(result.filePaths[0]);
+});
+
+// Open the external themes directory in Finder/Explorer
+ipcMain.handle('open-themes-dir', async () => {
+  const dir = config.externalThemesDir || path.join(app.getPath('userData'), 'themes');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   await shell.openPath(dir);
   return dir;
