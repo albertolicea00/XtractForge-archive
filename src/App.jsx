@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Download, ListOrdered, Settings as SettingsIcon, Folder, Play,
   CheckCircle2, AlertTriangle, Trash2, Sliders, Search,
@@ -168,6 +168,8 @@ export default function App() {
   const [copiedInstall, setCopiedInstall] = useState(null);
   // Which plugin's settings section is expanded in the Settings tab (null = all collapsed)
   const [expandedPlugin, setExpandedPlugin] = useState(null);
+  // Scroll container for the main content area (used to scroll to a plugin's settings)
+  const mainRef = useRef(null);
 
   // Themes
   const [themes, setThemes] = useState([]);
@@ -369,13 +371,19 @@ export default function App() {
     }
   };
 
-  // Jump to Settings tab with this plugin's section expanded and scrolled into view
+  // Jump to Settings tab with this plugin's section expanded and scrolled into view.
+  // Scroll the main-content container only — scrollIntoView would also move the
+  // window/app shell, leaving the whole interface shifted up.
   const goToPluginSettings = (id) => {
     setExpandedPlugin(id);
     setActiveTab('settings');
     setTimeout(() => {
       const el = document.getElementById(`plugin-settings-${id}`);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const container = mainRef.current;
+      if (el && container) {
+        const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 16;
+        container.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      }
     }, 80);
   };
 
@@ -481,7 +489,7 @@ export default function App() {
       </aside>
 
       {/* Main content */}
-      <main className="main-content">
+      <main className="main-content" ref={mainRef}>
 
         {/* ── TAB: Download ───────────────────────────────────────────────── */}
         {activeTab === 'download' && (
@@ -1110,7 +1118,9 @@ export default function App() {
             </div>
 
             {/* Per-plugin settings — collapsed by default, expand on click or via a plugin's Settings button */}
-            {Object.entries(pluginStatus).map(([id, plugin]) => {
+            {Object.entries(pluginStatus)
+              .sort((a, b) => (a[1].order ?? 99) - (b[1].order ?? 99))
+              .map(([id, plugin]) => {
               if (!plugin.configSchema || plugin.configSchema.length === 0) return null;
               const cfg = pluginConfigs[id] || {};
               const expanded = expandedPlugin === id;
