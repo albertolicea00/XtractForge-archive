@@ -10,7 +10,7 @@ module.exports = {
   tag: 'Core engine',   // short category label shown on the plugin card
   description: 'Download from YouTube, Vimeo, Twitter/X, TikTok, and 1000+ sites',
   type: 'downloader',
-  icon: '▶',
+  icon: '🎥',
   repoUrl: 'https://github.com/yt-dlp/yt-dlp',
   installHint: 'pip install yt-dlp  OR  brew install yt-dlp',
   // Per-OS install command. The renderer picks install[process.platform] and

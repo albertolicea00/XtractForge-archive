@@ -40,8 +40,8 @@ XtractForge ships with these plugins out of the box:
 
 | Plugin | Supported Sites |
 |---|---|
-| ▶️ **yt-dlp** | YouTube, Vimeo, Twitter/X, TikTok, Twitch, SoundCloud, 1000+ |
-| ⚡ **Lux** | Bilibili, Douyin, Kuaishou, Weibo, and more |
+| 🎥 **yt-dlp** | YouTube, Vimeo, Twitter/X, TikTok, Twitch, SoundCloud, 1000+ |
+| 🐉 **Lux** | Bilibili, Douyin, Kuaishou, Weibo, and more |
 | 🖼️ **gallery-dl** | DeviantArt, Pixiv, Reddit, Instagram, Danbooru, 200+ image galleries |
 | 🎵 **spotDL** | Spotify tracks, albums, and playlists (via YouTube Music) |
 

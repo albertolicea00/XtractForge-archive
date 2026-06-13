@@ -14,7 +14,7 @@ module.exports = {
   tag: 'Asian sites',
   description: 'Fast media downloader for Bilibili, Douyin, Kuaishou, and more',
   type: 'downloader',
-  icon: '⚡',
+  icon: '🐉',
   repoUrl: 'https://github.com/iawia002/lux',
   installHint: 'go install github.com/iawia002/lux@latest  OR  brew install lux',
   install: {
