@@ -77,6 +77,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 640,
     titleBarStyle: 'hiddenInset',
+    icon: path.join(__dirname, '../icons/AppIcon512.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
