@@ -1,7 +1,7 @@
 {
   "name": "xtractforge",
   "version": "1.0.0",
-  "description": "Premium cross-platform desktop GUI for yt-dlp",
+  "description": "Cross-platform desktop media downloader with a plugin architecture (yt-dlp, gallery-dl, spotDL, Lux, ffmpeg, curl).",
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
@@ -11,7 +11,10 @@
     "package:mac": "npm run build && electron-builder --mac",
     "package:win": "npm run build && electron-builder --win",
     "package:linux": "npm run build && electron-builder --linux",
-    "package:all": "npm run build && electron-builder --mac --win --linux"
+    "package:all": "npm run build && electron-builder --mac --win --linux",
+    "release:patch": "npm version patch && git push --follow-tags",
+    "release:minor": "npm version minor && git push --follow-tags",
+    "release:major": "npm version major && git push --follow-tags"
   },
   "keywords": [
     "yt-dlp",
@@ -21,7 +24,7 @@
     "react",
     "youtube-dl"
   ],
-  "author": "",
+  "author": "albertolicea00",
   "license": "MIT",
   "dependencies": {
     "lucide-react": "^0.454.0",
@@ -44,6 +47,11 @@
     "productName": "XtractForge",
     "directories": {
       "output": "dist-package"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "albertolicea00",
+      "repo": "XtractForge"
     },
     "files": [
       "dist/**/*",
