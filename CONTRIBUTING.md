@@ -68,8 +68,9 @@ helpers (`src/lib/`), each built-in plugin (`canHandle`, `parseProgress`,
 `buildDownloadArgs`, schema validity), and the plugin/theme managers (URL routing,
 registry, config merge). They run in Node (no DOM), so they're fast.
 
-**Run `pnpm test` before opening a PR.** Add or update tests when you change plugin
-routing, a helper, or a manager — keep regressions out.
+**Run `pnpm test` after every commit, and again before pushing and before opening a PR** The suite must be
+green before any push or release — if it fails, fix it first. Add or update tests when
+you change plugin routing, a helper, or a manager — keep regressions out.
 
 ---
 
