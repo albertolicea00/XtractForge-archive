@@ -32,7 +32,10 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # electron-builder fetches Electron itself; esbuild uses prebuilt optional
+      # deps — so build scripts aren't needed and we skip them to avoid pnpm's
+      # ignored-builds failure.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build renderer
         run: pnpm build
