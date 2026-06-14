@@ -4,7 +4,7 @@ const path = require('path');
 module.exports = {
   id: 'spotdl',
   name: 'spotDL',
-  order: 3,
+  order: 5,
   tag: 'Audio',
   description: 'Download Spotify tracks, albums, and playlists as high-quality audio',
   type: 'downloader',

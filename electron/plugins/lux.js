@@ -10,7 +10,7 @@ const HANDLED_SITES = [
 module.exports = {
   id: 'lux',
   name: 'Lux',
-  order: 4,
+  order: 6,
   tag: 'Asian sites',
   description: 'Fast media downloader for Bilibili, Douyin, Kuaishou, and more',
   type: 'downloader',

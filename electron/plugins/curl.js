@@ -19,7 +19,7 @@ function filenameFromUrl(url) {
 module.exports = {
   id: 'curl',
   name: 'curl',
-  order: 6,
+  order: 1,
   tag: 'Direct file',
   description: 'Download a direct file URL straight to disk (no extraction)',
   type: 'downloader',

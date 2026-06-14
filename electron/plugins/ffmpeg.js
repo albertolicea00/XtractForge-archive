@@ -17,7 +17,7 @@ function nameFromUrl(url) {
 module.exports = {
   id: 'ffmpeg',
   name: 'FFmpeg',
-  order: 5,
+  order: 2,
   tag: 'Streams',
   description: 'Record HLS (m3u8), DASH (mpd), and RTMP/RTSP live streams to a file',
   type: 'downloader',

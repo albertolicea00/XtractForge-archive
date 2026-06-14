@@ -11,7 +11,7 @@ const HANDLED_SITES = [
 module.exports = {
   id: 'gallery-dl',
   name: 'gallery-dl',
-  order: 2,
+  order: 4,
   tag: 'Images',
   description: 'Download image galleries from DeviantArt, Pixiv, Reddit, Instagram, and more',
   type: 'downloader',
