@@ -1,3 +1,5 @@
-allowBuilds:
-  electron: true
-  esbuild: true
+# Single-package repo. This file approves native build scripts
+# (pnpm 10+ blocks postinstall scripts unless listed here).
+onlyBuiltDependencies:
+  - electron
+  - esbuild
