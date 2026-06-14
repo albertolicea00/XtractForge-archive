@@ -47,6 +47,8 @@ XtractForge ships with these plugins out of the box:
 | 🐉 **Lux** | Bilibili, Douyin, Kuaishou, Weibo, and more |
 | 🖼️ **gallery-dl** | DeviantArt, Pixiv, Reddit, Instagram, Danbooru, 200+ image galleries |
 | 🎵 **spotDL** | Spotify tracks, albums, and playlists (via YouTube Music) |
+| 🎞️ **FFmpeg** | HLS (m3u8), DASH (mpd), and RTMP/RTSP live streams |
+| 🔗 **curl** | Direct file URLs (saved as-is) |
 
 → Full list, install instructions, and community plugin directory: **[ADDONS.md](ADDONS.md)**
 

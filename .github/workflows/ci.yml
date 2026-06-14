@@ -19,7 +19,9 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      # Tests + Vite build need no native postinstalls (electron binary etc.),
+      # so skip build scripts to avoid pnpm's ignored-builds failure.
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Test
         run: pnpm test
