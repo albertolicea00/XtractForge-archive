@@ -46,6 +46,11 @@ export default function QueueTab({
                 <div className="queue-item-title" title={item.title}>{item.title}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '11px', fontWeight: 600, color: st.color }}>● {st.label}</span>
+                  {item.isPlaylist && (
+                    <span style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', padding: '1px 6px', background: 'rgba(139,92,246,0.15)', color: 'var(--primary)', borderRadius: '10px' }}>
+                      Playlist{item.entryCount ? ` · ${item.entryCount}` : ''}
+                    </span>
+                  )}
                   {item.pluginId && pluginStatus[item.pluginId] && (
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                       {pluginStatus[item.pluginId].icon} {pluginStatus[item.pluginId].name}

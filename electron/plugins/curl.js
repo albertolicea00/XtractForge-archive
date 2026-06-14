@@ -61,11 +61,11 @@ module.exports = {
 
   getInfo(url, config) {
     // No metadata service — return a minimal stub so the UI can show a title.
-    const title = filenameFromUrl(url);
+    const name = filenameFromUrl(url);
     return Promise.resolve({
       success: true,
       data: {
-        title,
+        title: name,
         thumbnail: '',
         thumbnails: [],
         duration: 0,
@@ -74,14 +74,19 @@ module.exports = {
         view_count: null,
         formats: [],
         _plugin: 'curl',
-        _simpleDownload: true,
+        // curl downloads the file as-is — it can't transcode. Let the user pick
+        // the saved filename/extension only.
+        _downloadOptions: [
+          { key: 'filename', label: 'Save as', type: 'text', default: name, placeholder: name, help: "curl saves the file as-is; it does not convert formats. Change the name/extension only." },
+        ],
       },
     });
   },
 
   buildDownloadArgs(url, options, config) {
     const bin = config.curlPath || 'curl';
-    const out = path.join(options.downloadFolder || '.', filenameFromUrl(url));
+    const name = (options.pluginOptions && options.pluginOptions.filename) || filenameFromUrl(url);
+    const out = path.join(options.downloadFolder || '.', name);
     // -L follow redirects, -o output, --create-dirs; -C - resumes a partial file
     const args = ['-L', '--create-dirs'];
     if (options.resume) args.push('-C', '-');

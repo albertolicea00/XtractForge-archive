@@ -288,6 +288,7 @@ export default function App() {
       speedLimit: settings.speedLimit,
       embedSubtitles: settings.embedSubtitles,
       sponsorBlock: settings.sponsorBlock,
+      isPlaylist: !!videoInfo._isPlaylist,
       // Values from a plugin-declared download form (info._downloadOptions)
       pluginOptions: pluginOpts,
     };
@@ -306,6 +307,8 @@ export default function App() {
       errorMsg: '',
       folder: settings.downloadFolder,
       audioOnly: isAudio,
+      isPlaylist: !!videoInfo._isPlaylist,
+      entryCount: videoInfo._entryCount || 0,
     };
 
     setQueue(prev => [newItem, ...prev]);

@@ -73,7 +73,9 @@ module.exports = {
         if (code === 0) {
           try {
             const data = JSON.parse(stdout);
-            resolve({ success: true, data: { ...data, _plugin: 'yt-dlp' } });
+            const isPlaylist = data._type === 'playlist' || Array.isArray(data.entries);
+            const entryCount = Array.isArray(data.entries) ? data.entries.length : 0;
+            resolve({ success: true, data: { ...data, _plugin: 'yt-dlp', _isPlaylist: isPlaylist, _entryCount: entryCount } });
           } catch (e) {
             reject(new Error('Failed to parse yt-dlp output: ' + e.message));
           }
@@ -89,7 +91,11 @@ module.exports = {
     const bin = config.ytdlpPath || 'yt-dlp';
     const args = [];
 
-    args.push('-o', path.join(options.downloadFolder || '.', '%(title)s.%(ext)s'));
+    // Playlists nest into a folder, numbered by index; single videos stay flat
+    const template = options.isPlaylist
+      ? '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
+      : '%(title)s.%(ext)s';
+    args.push('-o', path.join(options.downloadFolder || '.', template));
 
     if (options.speedLimit || config.speedLimit) {
       args.push('-r', options.speedLimit || config.speedLimit);

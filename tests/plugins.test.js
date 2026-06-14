@@ -87,4 +87,27 @@ describe('buildDownloadArgs', () => {
     expect(args.some(a => a.endsWith('.mkv'))).toBe(true);
     expect(args).toContain('copy');
   });
+
+  it('curl uses a custom filename from pluginOptions and resumes with -C -', () => {
+    const { args } = curl.buildDownloadArgs('https://x.com/a/video.mp4', { downloadFolder: '/tmp', resume: true, pluginOptions: { filename: 'clip.mp4' } }, {});
+    expect(args.join(' ')).toContain('/tmp/clip.mp4');
+    expect(args.join(' ')).toContain('-C -');
+  });
+
+  it('yt-dlp nests playlists into a playlist folder template', () => {
+    const flat = ytdlp.buildDownloadArgs('https://y/x', { downloadFolder: '/tmp' }, {});
+    expect(flat.args.join(' ')).toContain('%(title)s.%(ext)s');
+    expect(flat.args.join(' ')).not.toContain('playlist_title');
+    const pl = ytdlp.buildDownloadArgs('https://y/list', { downloadFolder: '/tmp', isPlaylist: true }, {});
+    expect(pl.args.join(' ')).toContain('%(playlist_title)s');
+  });
+});
+
+describe('plugin getInfo metadata', () => {
+  it('curl exposes a filename download option', () => {
+    return curl.getInfo('https://x.com/a/video.mp4', {}).then(r => {
+      expect(r.data._downloadOptions[0].key).toBe('filename');
+      expect(r.data._downloadOptions[0].default).toBe('video.mp4');
+    });
+  });
 });
