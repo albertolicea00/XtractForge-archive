@@ -489,6 +489,9 @@ export default function App() {
             <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Active tools
             </p>
+            {checkingDeps && availableDownloaders.length === 0 && (
+              [0, 1, 2].map(i => <div key={i} className="skeleton" style={{ height: '12px', width: `${70 - i * 12}%` }} />)
+            )}
             {availableDownloaders.length === 0 && !checkingDeps && (
               <div className="status-badge">
                 <span className="status-indicator error"></span>
@@ -950,6 +953,8 @@ export default function App() {
 
             {/* Plugin cards — built-ins by `order`, imported ones in import order after */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+              {checkingDeps && downloaderPlugins.length === 0 &&
+                [0, 1, 2, 3].map(i => <div key={`sk-${i}`} className="skeleton skeleton-card" />)}
               {downloaderPlugins.map(([id, rawPlugin]) => {
                 const plugin = localizePlugin(rawPlugin, language);
                 const enabled = !disabledPlugins.includes(id);
