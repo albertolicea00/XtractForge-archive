@@ -6,6 +6,8 @@ const BUILTIN_PLUGINS = [
   require('./plugins/spotdl'),
   require('./plugins/gallery-dl'),
   require('./plugins/lux'),
+  require('./plugins/ffmpeg'),
+  require('./plugins/curl'),
   require('./plugins/ytdlp'),
 ];
 

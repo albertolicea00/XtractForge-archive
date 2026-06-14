@@ -785,6 +785,12 @@ export default function App() {
                         spotDL will match and download all tracks via YouTube Music.
                         Configure format/bitrate in Settings → Plugins → spotDL.
                       </div>
+                    ) : (videoInfo._simpleDownload || !(videoInfo.formats && videoInfo.formats.length)) ? (
+                      <div style={{ padding: '16px', background: 'rgba(139,92,246,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                        {detectedPlugin && pluginStatus[detectedPlugin]
+                          ? `${pluginStatus[detectedPlugin].name} will download this directly to your folder. Options are configured in Settings → Plugins.`
+                          : 'This will be downloaded directly to your folder.'}
+                      </div>
                     ) : (
                       <>
                         <div className="tabs">
