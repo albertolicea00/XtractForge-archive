@@ -52,7 +52,8 @@
     "publish": {
       "provider": "github",
       "owner": "albertolicea00",
-      "repo": "XtractForge"
+      "repo": "XtractForge",
+      "releaseType": "release"
     },
     "files": [
       "dist/**/*",
@@ -97,6 +98,8 @@
     },
     "linux": {
       "icon": "icons/AppIcon512.png",
+      "maintainer": "albertolicea00 <albertolicea00@users.noreply.github.com>",
+      "category": "Utility",
       "target": [
         {
           "target": "AppImage",
