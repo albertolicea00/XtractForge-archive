@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 const pluginManager = require('./plugin-manager');
 const themeManager = require('./theme-manager');
 
@@ -22,6 +23,10 @@ let config = {
   embedSubtitles: false,
   sponsorBlock: false,
   defaultFormat: 'bestvideo+bestaudio/best',
+  // Download to a temp dir first (resumable), then move to the final folder on success
+  stageToTemp: true,
+  // Output organization in the final folder: 'none' | 'type' | 'source'
+  organize: 'none',
   plugins: {},
   disabledPlugins: [],
   // Directory where user-installed external plugin .js files are stored
@@ -168,6 +173,8 @@ ipcMain.handle('get-settings', () => ({
   disabledPlugins: config.disabledPlugins || [],
   autoCheckUpdates: config.autoCheckUpdates !== false,
   language: config.language || 'en',
+  stageToTemp: config.stageToTemp !== false,
+  organize: config.organize || 'none',
 }));
 
 // Current app version
@@ -372,14 +379,79 @@ ipcMain.handle('open-folder', async (event, folderPath) => {
 });
 
 // Start a download — routes to the plugin that handled the URL's getInfo
+// Map a file extension to an organization category folder
+const MEDIA_CATEGORIES = {
+  Video: ['mp4', 'mkv', 'webm', 'mov', 'avi', 'flv', 'ts', 'm4v'],
+  Audio: ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus'],
+  Images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'],
+};
+function categoryForExt(ext) {
+  const e = ext.replace(/^\./, '').toLowerCase();
+  for (const [cat, exts] of Object.entries(MEDIA_CATEGORIES)) {
+    if (exts.includes(e)) return cat;
+  }
+  return 'Other';
+}
+
+// Stable temp dir per URL so re-downloading the same URL resumes partial files
+function tempDirFor(finalFolder, url) {
+  const hash = crypto.createHash('sha1').update(url).digest('hex').slice(0, 12);
+  return path.join(finalFolder, '.xtractforge-tmp', hash);
+}
+
+// Move src → dest, falling back to copy+remove across volumes
+function safeMove(src, dest) {
+  try {
+    fs.renameSync(src, dest);
+  } catch {
+    fs.cpSync(src, dest, { recursive: true });
+    fs.rmSync(src, { recursive: true, force: true });
+  }
+}
+
+// Move everything from tempDir into finalFolder, applying the organize mode
+function moveDownloadFiles(tempDir, finalFolder, organize, pluginId) {
+  for (const name of fs.readdirSync(tempDir)) {
+    const src = path.join(tempDir, name);
+    let destDir = finalFolder;
+    if (organize === 'type') {
+      const isDir = fs.statSync(src).isDirectory();
+      destDir = path.join(finalFolder, isDir ? 'Other' : categoryForExt(path.extname(name)));
+    } else if (organize === 'source') {
+      destDir = path.join(finalFolder, pluginId);
+    }
+    fs.mkdirSync(destDir, { recursive: true });
+    safeMove(src, path.join(destDir, name));
+  }
+}
+
 ipcMain.handle('start-download', async (event, downloadId, url, options) => {
   const pluginId = options.pluginId || 'yt-dlp';
   const plugin = pluginManager.getPlugin(pluginId) || pluginManager.getPlugin('yt-dlp');
   const pluginCfg = pluginManager.getPluginConfig(plugin.id, config);
 
+  const finalFolder = options.downloadFolder || config.downloadFolder;
+  const stage = config.stageToTemp !== false;
+  const organize = options.organize || config.organize || 'none';
+
+  // Download into a temp dir (resumable) then move to the final folder on success
+  let workFolder = finalFolder;
+  let tempDir = null;
+  if (stage) {
+    try {
+      tempDir = tempDirFor(finalFolder, url);
+      fs.mkdirSync(tempDir, { recursive: true });
+      workFolder = tempDir;
+    } catch {
+      tempDir = null;
+      workFolder = finalFolder;
+    }
+  }
+
   const downloadOptions = {
     ...options,
-    downloadFolder: options.downloadFolder || config.downloadFolder,
+    downloadFolder: workFolder,
+    resume: stage,   // let plugins add resume flags (e.g. curl -C -)
     speedLimit: options.speedLimit || config.speedLimit,
     embedSubtitles: options.embedSubtitles ?? config.embedSubtitles,
     sponsorBlock: options.sponsorBlock ?? config.sponsorBlock,
@@ -415,11 +487,22 @@ ipcMain.handle('start-download', async (event, downloadId, url, options) => {
 
   proc.on('close', (code) => {
     activeDownloads.delete(downloadId);
-    if (!mainWindow) return;
     if (code === 0) {
-      mainWindow.webContents.send('download-complete', { downloadId, status: 'completed' });
+      // Move finished files out of temp into the final folder (applying organize),
+      // then drop the temp dir. On move failure, surface an error.
+      if (tempDir) {
+        try {
+          moveDownloadFiles(tempDir, finalFolder, organize, plugin.id);
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        } catch (e) {
+          if (mainWindow) mainWindow.webContents.send('download-error', { downloadId, status: 'error', error: `Move to destination failed: ${e.message}` });
+          return;
+        }
+      }
+      if (mainWindow) mainWindow.webContents.send('download-complete', { downloadId, status: 'completed' });
     } else {
-      mainWindow.webContents.send('download-error', { downloadId, status: 'error', error: `${plugin.name} exited with code ${code}` });
+      // Leave tempDir in place so a retry of the same URL can resume
+      if (mainWindow) mainWindow.webContents.send('download-error', { downloadId, status: 'error', error: `${plugin.name} exited with code ${code}` });
     }
   });
 

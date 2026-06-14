@@ -82,8 +82,10 @@ module.exports = {
   buildDownloadArgs(url, options, config) {
     const bin = config.curlPath || 'curl';
     const out = path.join(options.downloadFolder || '.', filenameFromUrl(url));
-    // -L follow redirects, -# progress bar, -o output, --create-dirs
-    const args = ['-L', '--create-dirs', '-o', out, url];
+    // -L follow redirects, -o output, --create-dirs; -C - resumes a partial file
+    const args = ['-L', '--create-dirs'];
+    if (options.resume) args.push('-C', '-');
+    args.push('-o', out, url);
     if (options.speedLimit || config.speedLimit) {
       args.push('--limit-rate', options.speedLimit || config.speedLimit);
     }

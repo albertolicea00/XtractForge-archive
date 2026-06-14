@@ -53,6 +53,8 @@ export default function App() {
     speedLimit: '',
     embedSubtitles: false,
     sponsorBlock: false,
+    stageToTemp: true,
+    organize: 'none',
   });
 
   // Plugin-specific configs: { [pluginId]: { ...keys } }
@@ -106,6 +108,8 @@ export default function App() {
           speedLimit: saved.speedLimit || '',
           embedSubtitles: !!saved.embedSubtitles,
           sponsorBlock: !!saved.sponsorBlock,
+          stageToTemp: saved.stageToTemp !== false,
+          organize: saved.organize || 'none',
         }));
         setDisabledPlugins(saved.disabledPlugins || []);
         if (typeof saved.autoCheckUpdates === 'boolean') setAutoCheckUpdates(saved.autoCheckUpdates);

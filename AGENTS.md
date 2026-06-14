@@ -242,6 +242,8 @@ window.api.onDownloadError(({ downloadId, status, error }) => {})
   "speedLimit": "",
   "embedSubtitles": false,
   "sponsorBlock": false,
+  "stageToTemp": true,
+  "organize": "none",
   "disabledPlugins": [],
   "externalPluginsDir": "<userData>/plugins",
   "activeTheme": "cyber-glass",
@@ -254,6 +256,13 @@ window.api.onDownloadError(({ downloadId, status, error }) => {})
   }
 }
 ```
+
+**Download staging.** When `stageToTemp` is on (default), `start-download` runs the
+tool into `<finalFolder>/.xtractforge-tmp/<urlHash>/` and, on exit code 0, moves the
+files into the final folder applying `organize` (`none` | `type` | `source`), then
+removes the temp dir. The temp dir is keyed by URL hash and **left in place on failure**
+so re-downloading the same URL resumes (`options.resume` is passed to `buildDownloadArgs`
+— curl adds `-C -`; yt-dlp continues `.part` files by default).
 
 ---
 

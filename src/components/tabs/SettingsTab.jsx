@@ -56,7 +56,24 @@ export default function SettingsTab({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Download Defaults</h3>
 
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label>Organize into folders</label>
+              <select value={settings.organize || 'none'} onChange={(e) => updateSetting({ organize: e.target.value })} style={{ padding: '12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
+                <option value="none">Flat — all files in the folder</option>
+                <option value="type">By type — Video / Audio / Images / Other</option>
+                <option value="source">By source — one folder per tool</option>
+              </select>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>How finished files are sorted inside your download folder.</span>
+            </div>
+
             <div className="toggle-group">
+              <div className="toggle-row">
+                <div className="toggle-details">
+                  <span className="toggle-title">Resumable downloads</span>
+                  <span className="toggle-desc">Download to a temp folder first, then move on completion — lets yt-dlp/curl resume interrupted downloads.</span>
+                </div>
+                <label className="switch"><input type="checkbox" checked={settings.stageToTemp !== false} onChange={(e) => updateSetting({ stageToTemp: e.target.checked })} /><span className="slider"></span></label>
+              </div>
               <div className="toggle-row">
                 <div className="toggle-details">
                   <span className="toggle-title">Embed Subtitles</span>
