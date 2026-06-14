@@ -204,6 +204,12 @@ export default function App() {
   // Scroll container for the main content area
   const mainRef = useRef(null);
 
+  // Updates
+  const [appVersion, setAppVersion] = useState('');
+  const [autoCheckUpdates, setAutoCheckUpdates] = useState(true);
+  const [updateInfo, setUpdateInfo] = useState(null);   // { current, latest, hasUpdate, url, error }
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
   // Themes
   const [themes, setThemes] = useState([]);
   const [activeThemeId, setActiveThemeId] = useState('xtractforge-default');
@@ -230,6 +236,7 @@ export default function App() {
           sponsorBlock: !!saved.sponsorBlock,
         }));
         setDisabledPlugins(saved.disabledPlugins || []);
+        if (typeof saved.autoCheckUpdates === 'boolean') setAutoCheckUpdates(saved.autoCheckUpdates);
       }
     } catch (err) {
       console.error('Failed to check dependencies:', err);
@@ -250,6 +257,30 @@ export default function App() {
       console.error('Failed to load themes:', err);
     }
   }, []);
+
+  const handleCheckUpdates = useCallback(async () => {
+    setCheckingUpdate(true);
+    try {
+      const r = await window.api.checkForUpdates();
+      setUpdateInfo(r);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }, []);
+
+  const handleToggleAutoUpdates = (val) => {
+    setAutoCheckUpdates(val);
+    window.api.saveSettings({ autoCheckUpdates: val });
+  };
+
+  // Load version on mount, and auto-check for updates if enabled
+  useEffect(() => {
+    window.api.getAppVersion().then(setAppVersion).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (autoCheckUpdates) handleCheckUpdates();
+  }, [autoCheckUpdates, handleCheckUpdates]);
 
   useEffect(() => {
     refreshPlugins();
@@ -531,8 +562,13 @@ export default function App() {
 
       {/* Sidebar */}
       <aside className="sidebar">
-        <div className="brand">
+        <div className="brand" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
           <span className="brand-name">XtractForge</span>
+          {appVersion && (
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.5px' }}>
+              v{appVersion}{updateInfo?.hasUpdate ? ' · update available' : ''}
+            </span>
+          )}
         </div>
 
         <ul className="nav-links">
@@ -1405,6 +1441,47 @@ export default function App() {
               <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => { setActiveTab('plugins'); setSelectedPlugin(null); }}>
                 <Puzzle size={14} /> Open Plugins
               </button>
+            </div>
+
+            {/* Updates */}
+            <div className="glass-card">
+              <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>Updates</h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                XtractForge <strong>v{appVersion || '—'}</strong>. Releases are published on GitHub.
+              </p>
+
+              <div className="toggle-row" style={{ marginBottom: '16px' }}>
+                <div className="toggle-details">
+                  <span className="toggle-title">Check for updates on startup</span>
+                  <span className="toggle-desc">Compare your version against the latest GitHub release when the app launches.</span>
+                </div>
+                <label className="switch">
+                  <input type="checkbox" checked={autoCheckUpdates} onChange={(e) => handleToggleAutoUpdates(e.target.checked)} />
+                  <span className="slider"></span>
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                <button className="btn btn-secondary" onClick={handleCheckUpdates} disabled={checkingUpdate} style={{ fontSize: '13px', padding: '8px 14px' }}>
+                  {checkingUpdate ? <><RefreshCw className="spinner" size={14} /> Checking…</> : <><RefreshCw size={14} /> Check now</>}
+                </button>
+                {updateInfo && !checkingUpdate && (
+                  updateInfo.error ? (
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Couldn't check: {updateInfo.error}</span>
+                  ) : updateInfo.hasUpdate ? (
+                    <span style={{ fontSize: '13px', color: 'var(--text-success)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      Update available: v{updateInfo.latest}
+                      <button className="btn btn-primary" style={{ fontSize: '12px', padding: '6px 12px' }} onClick={() => window.api.openExternal(updateInfo.url || 'https://github.com/albertolicea00/XtractForge/releases/latest')}>
+                        <Globe size={13} /> Download
+                      </button>
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={14} style={{ color: 'var(--text-success)' }} /> You're on the latest version{updateInfo.latest ? ` (v${updateInfo.latest})` : ''}.
+                    </span>
+                  )
+                )}
+              </div>
             </div>
           </div>
         )}

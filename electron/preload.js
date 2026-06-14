@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('api', {
   // System
   platform: process.platform,   // 'darwin' | 'win32' | 'linux'
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   getDefaultDownloadsFolder: () => ipcRenderer.invoke('get-default-downloads-folder'),

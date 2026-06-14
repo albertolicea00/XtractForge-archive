@@ -26,6 +26,8 @@ let config = {
   disabledPlugins: [],
   // Directory where user-installed external plugin .js files are stored
   externalPluginsDir: path.join(app.getPath('userData'), 'plugins'),
+  // Updates
+  autoCheckUpdates: true,
   // Theming
   activeTheme: 'xtractforge-default',
   themeSettings: { accentOverride: '#34d399', glassIntensity: 75, monoFont: true },
@@ -162,7 +164,36 @@ ipcMain.handle('get-settings', () => ({
   embedSubtitles: !!config.embedSubtitles,
   sponsorBlock: !!config.sponsorBlock,
   disabledPlugins: config.disabledPlugins || [],
+  autoCheckUpdates: config.autoCheckUpdates !== false,
 }));
+
+// Current app version
+ipcMain.handle('get-app-version', () => app.getVersion());
+
+// Check GitHub for a newer release. Returns { current, latest, hasUpdate, url, error }.
+ipcMain.handle('check-for-updates', async () => {
+  const current = app.getVersion();
+  try {
+    const res = await fetch('https://api.github.com/repos/albertolicea00/XtractForge/releases/latest', {
+      headers: { 'User-Agent': 'XtractForge', 'Accept': 'application/vnd.github+json' },
+    });
+    if (!res.ok) return { current, latest: null, hasUpdate: false, error: `GitHub returned ${res.status}` };
+    const data = await res.json();
+    const latest = (data.tag_name || '').replace(/^v/, '');
+    const cmp = (a, b) => {
+      const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const d = (pa[i] || 0) - (pb[i] || 0);
+        if (d) return d;
+      }
+      return 0;
+    };
+    const hasUpdate = latest && cmp(latest, current) > 0;
+    return { current, latest: latest || null, hasUpdate, url: data.html_url || '' };
+  } catch (e) {
+    return { current, latest: null, hasUpdate: false, error: e.message };
+  }
+});
 
 // Get plugin-specific settings
 ipcMain.handle('get-plugin-configs', () => {
