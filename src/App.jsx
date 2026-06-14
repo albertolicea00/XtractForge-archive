@@ -64,6 +64,23 @@ const QUEUE_STATUS = {
 
 const MONO_STACK = "'SFMono-Regular', 'JetBrains Mono', 'Fira Code', Consolas, monospace";
 
+// Font-family presets for the Typography picker. value '' = use the theme's own font.
+const FONT_PRESETS = [
+  { label: 'Theme default', value: '' },
+  { label: 'System Sans', value: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" },
+  { label: 'Outfit', value: "'Outfit', sans-serif" },
+  { label: 'Monospace', value: MONO_STACK },
+  { label: 'Serif', value: "Georgia, 'Times New Roman', serif" },
+];
+
+// Body text weight options (headings keep their own inline weight).
+// Sub-bold weights collapse on single-weight fonts (e.g. the default mono),
+// so only the reliably-distinct steps are offered.
+const FONT_WEIGHTS = [
+  { label: 'Normal', value: 'normal' },
+  { label: 'Bold', value: '700' },
+];
+
 function hexToRgba(hex, alpha) {
   if (typeof hex !== 'string') return null;
   const h = hex.trim().replace('#', '');
@@ -115,11 +132,24 @@ function buildThemeCss(theme, settings = {}) {
     vars['--gradient-hover'] = `linear-gradient(135deg, ${accent} 0%, ${accent} 100%)`;
   }
 
-  // Mono font toggle.
-  if (settings.monoFont) vars['--font-sans'] = MONO_STACK;
+  // Font family: explicit user pick wins over the legacy mono toggle, which wins
+  // over the theme's own --font-sans (left untouched when neither is set).
+  const fontFamily = (settings.fontFamily || '').trim();
+  if (fontFamily) vars['--font-sans'] = fontFamily;
+  else if (settings.monoFont) vars['--font-sans'] = MONO_STACK;
 
   const body = Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join('\n');
-  return `:root {\n${body}\n}\n${theme.css || ''}`;
+
+  // Text tweaks that cascade from <body> (inline-weighted elements like headings
+  // keep their own weight; plain body copy inherits these).
+  const textRules = [];
+  const fw = settings.fontWeight;
+  if (fw && fw !== 'normal') textRules.push(`font-weight: ${fw};`);
+  const ls = settings.letterSpacing;
+  if (typeof ls === 'number' && ls !== 0) textRules.push(`letter-spacing: ${ls / 100}em;`);
+  const bodyCss = textRules.length ? `\nbody { ${textRules.join(' ')} }` : '';
+
+  return `:root {\n${body}\n}\n${theme.css || ''}${bodyCss}`;
 }
 
 function applyTheme(theme, settings) {
@@ -136,7 +166,11 @@ function applyTheme(theme, settings) {
   try { localStorage.setItem('xf-theme-css', css); } catch {}
 }
 
-const ACCENT_PRESETS = ['#adc6ff', '#ff8a80', '#34d399', '#c4b5fd', '#fbbf24'];
+const ACCENT_PRESETS = [
+  '#adc6ff', '#60a5fa', '#2dd4bf', '#34d399', '#a3e635',
+  '#fbbf24', '#fb923c', '#ff8a80', '#f472b6', '#e879f9',
+  '#c4b5fd', '#818cf8',
+];
 
 // Overlay a plugin's own per-language strings (plugin.locales[lang]) onto its
 // base (English) fields, so plugin-provided text is translated too.
@@ -182,6 +216,8 @@ export default function App() {
   const [detectedPlugin, setDetectedPlugin] = useState(null);
   // Which engine to extract with: 'auto' (let XtractForge pick) or a plugin id
   const [chosenEngine, setChosenEngine] = useState('auto');
+  // Values for a plugin-declared download form (info._downloadOptions)
+  const [pluginOpts, setPluginOpts] = useState({});
 
   // Format selection
   const [downloadType, setDownloadType] = useState('video');
@@ -235,7 +271,7 @@ export default function App() {
   // Themes
   const [themes, setThemes] = useState([]);
   const [activeThemeId, setActiveThemeId] = useState('xtractforge-default');
-  const [themeSettings, setThemeSettings] = useState({ accentOverride: '#34d399', glassIntensity: 75, monoFont: true });
+  const [themeSettings, setThemeSettings] = useState({ accentOverride: '#34d399', glassIntensity: 75, monoFont: true, fontFamily: '', fontScale: 100, fontWeight: 'normal', letterSpacing: 0 });
   const [themeImportResult, setThemeImportResult] = useState(null);
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -362,6 +398,12 @@ export default function App() {
     if (theme) applyTheme(theme, themeSettings);
   }, [themes, activeThemeId, themeSettings]);
 
+  // Text size = real browser zoom (reflows the whole window, no empty gaps).
+  useEffect(() => {
+    const scale = typeof themeSettings.fontScale === 'number' ? themeSettings.fontScale : 100;
+    window.api.setZoomFactor?.(scale / 100);
+  }, [themeSettings.fontScale]);
+
   // ── Download tab ──────────────────────────────────────────────────────────
 
   const handleAnalyze = async (e, overrideUrl) => {
@@ -380,6 +422,10 @@ export default function App() {
       if (response.success) {
         setVideoInfo(response.data);
         setDetectedPlugin(response.pluginId || 'yt-dlp');
+        // Seed any plugin-declared download form with its defaults
+        const dlOpts = {};
+        (response.data._downloadOptions || []).forEach(f => { dlOpts[f.key] = f.default; });
+        setPluginOpts(dlOpts);
         if (response.data.formats?.length > 0) {
           const vf = response.data.formats.filter(f => f.vcodec !== 'none' && f.resolution);
           if (vf.length > 0) setSelectedCustomFormat(vf[vf.length - 1].format_id);
@@ -423,6 +469,8 @@ export default function App() {
       speedLimit: settings.speedLimit,
       embedSubtitles: settings.embedSubtitles,
       sponsorBlock: settings.sponsorBlock,
+      // Values from a plugin-declared download form (info._downloadOptions)
+      pluginOptions: pluginOpts,
     };
 
     const newItem = {
@@ -784,6 +832,30 @@ export default function App() {
                       <div style={{ padding: '16px', background: 'rgba(139,92,246,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '13px' }}>
                         spotDL will match and download all tracks via YouTube Music.
                         Configure format/bitrate in Settings → Plugins → spotDL.
+                      </div>
+                    ) : (videoInfo._downloadOptions && videoInfo._downloadOptions.length) ? (
+                      /* Plugin-declared download form — the plugin owns this UI */
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        {videoInfo._downloadOptions.map(field => (
+                          <div key={field.key} className="input-group" style={{ marginBottom: 0 }}>
+                            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                              {field.label}
+                              {field.help && <span className="help-tip" data-tip={field.help}><HelpCircle size={13} /></span>}
+                            </label>
+                            {field.type === 'toggle' ? (
+                              <label className="switch">
+                                <input type="checkbox" checked={!!(pluginOpts[field.key] ?? field.default)} onChange={(e) => setPluginOpts(prev => ({ ...prev, [field.key]: e.target.checked }))} />
+                                <span className="slider"></span>
+                              </label>
+                            ) : field.type === 'select' ? (
+                              <select value={pluginOpts[field.key] ?? field.default} onChange={(e) => setPluginOpts(prev => ({ ...prev, [field.key]: e.target.value }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
+                                {(field.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            ) : (
+                              <input type="text" placeholder={field.placeholder || ''} value={pluginOpts[field.key] ?? field.default ?? ''} onChange={(e) => setPluginOpts(prev => ({ ...prev, [field.key]: e.target.value }))} style={{ padding: '10px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ) : (videoInfo._simpleDownload || !(videoInfo.formats && videoInfo.formats.length)) ? (
                       <div style={{ padding: '16px', background: 'rgba(139,92,246,0.08)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '13px' }}>
@@ -1302,7 +1374,7 @@ export default function App() {
                           <div key={i} style={{ width: '15px', height: '15px', borderRadius: '50%', background: c, border: '2px solid rgba(255,255,255,0.15)' }} />
                         ))}
                       </div>
-                      <div style={{ padding: '8px 10px 10px', background: 'var(--bg-hover)' }}>
+                      <div style={{ padding: '8px 10px 10px', background: 'var(--bg-hover)', height: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 600, fontSize: '13px' }}>{theme.name}</span>
                           {theme.isBuiltin
@@ -1333,7 +1405,14 @@ export default function App() {
                       onChange={(e) => handleThemeSetting({ accentOverride: e.target.value })}
                       style={{ width: '90px', background: 'none', border: 'none', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '14px', outline: 'none' }}
                     />
-                    <span style={{ width: '18px', height: '18px', borderRadius: '50%', background: themeSettings.accentOverride || 'var(--primary)', border: '1px solid var(--border-color)' }} />
+                    <label title="Pick from palette" style={{ position: 'relative', width: '22px', height: '22px', borderRadius: '50%', background: themeSettings.accentOverride || 'var(--primary)', border: '1px solid var(--border-color)', cursor: 'pointer', flexShrink: 0 }}>
+                      <input
+                        type="color"
+                        value={/^#[0-9a-fA-F]{6}$/.test(themeSettings.accentOverride || '') ? themeSettings.accentOverride : '#8b5cf6'}
+                        onChange={(e) => handleThemeSetting({ accentOverride: e.target.value })}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer', padding: 0, border: 'none' }}
+                      />
+                    </label>
                   </div>
                   {ACCENT_PRESETS.map(c => (
                     <button
@@ -1358,20 +1437,103 @@ export default function App() {
               </div>
 
               <div className="glass-card">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: 600 }}>Glass Intensity</h3>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{themeSettings.glassIntensity}%</span>
+                <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>Typography</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  Font, weight and spacing for body text. "Theme default" keeps each theme's own font.
+                </p>
+                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                  <div style={{ flex: '1 1 220px', minWidth: '180px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>Font Family</label>
+                    <select
+                      value={themeSettings.fontFamily || ''}
+                      onChange={(e) => handleThemeSetting({ fontFamily: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px', cursor: 'pointer' }}
+                    >
+                      {FONT_PRESETS.map(f => (
+                        <option key={f.label} value={f.value} style={{ fontFamily: f.value || 'inherit' }}>{f.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={{ flex: '1 1 220px', minWidth: '180px' }}>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '6px' }}>Font Weight</label>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      {FONT_WEIGHTS.map(w => {
+                        const active = (themeSettings.fontWeight || 'normal') === w.value;
+                        return (
+                          <button
+                            key={w.value}
+                            onClick={() => handleThemeSetting({ fontWeight: w.value })}
+                            style={{
+                              flex: 1, padding: '9px 4px', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                              fontFamily: 'var(--font-sans)', fontSize: '12px', fontWeight: w.value === 'normal' ? 400 : Number(w.value),
+                              background: active ? 'var(--primary)' : 'var(--bg-input)',
+                              color: active ? 'var(--bg-dark)' : 'var(--text-secondary)',
+                              border: `1px solid ${active ? 'var(--primary)' : 'var(--border-color)'}`,
+                            }}
+                          >
+                            {w.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={themeSettings.glassIntensity}
-                  onChange={(e) => handleThemeSetting({ glassIntensity: Number(e.target.value) })}
-                  style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
-                />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '6px' }}>
-                  <span>SOLID</span><span>FROSTED</span><span>TRANSLUCENT</span>
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Letter Spacing</label>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary)' }}>{(themeSettings.letterSpacing ?? 0) > 0 ? '+' : ''}{themeSettings.letterSpacing ?? 0}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-5"
+                    max="20"
+                    step="1"
+                    value={themeSettings.letterSpacing ?? 0}
+                    onChange={(e) => handleThemeSetting({ letterSpacing: Number(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    <span>TIGHT</span><span>NORMAL</span><span>WIDE</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
+                <div className="glass-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600 }}>Glass Intensity</h3>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{themeSettings.glassIntensity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={themeSettings.glassIntensity}
+                    onChange={(e) => handleThemeSetting({ glassIntensity: Number(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    <span>SOLID</span><span>FROSTED</span><span>TRANSLUCENT</span>
+                  </div>
+                </div>
+
+                <div className="glass-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: 600 }}>Zoom</h3>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--primary)' }}>{themeSettings.fontScale ?? 100}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="80"
+                    max="140"
+                    step="5"
+                    value={themeSettings.fontScale ?? 100}
+                    onChange={(e) => handleThemeSetting({ fontScale: Number(e.target.value) })}
+                    style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    <span>SMALL</span><span>DEFAULT</span><span>LARGE</span>
+                  </div>
                 </div>
               </div>
 

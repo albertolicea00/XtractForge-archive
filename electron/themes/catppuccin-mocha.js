@@ -9,6 +9,7 @@ module.exports = {
   swatches: ['#cba6f7', '#89b4fa', '#1e1e2e'],
 
   variables: {
+    '--font-sans': "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     '--bg-deep': '#181825',
     '--bg-dark': '#1e1e2e',
     '--bg-card': 'rgba(30, 30, 46, 0.7)',

@@ -1,8 +1,10 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   // System
   platform: process.platform,   // 'darwin' | 'win32' | 'linux'
+  // Real browser zoom (reflows layout, no gaps). factor 1 = 100%.
+  setZoomFactor: (factor) => webFrame.setZoomFactor(factor),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   checkDependencies: () => ipcRenderer.invoke('check-dependencies'),

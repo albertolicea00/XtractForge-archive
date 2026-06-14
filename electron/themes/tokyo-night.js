@@ -9,6 +9,7 @@ module.exports = {
   swatches: ['#7aa2f7', '#bb9af7', '#1a1b26'],
 
   variables: {
+    '--font-sans': "'SFMono-Regular', 'JetBrains Mono', 'Fira Code', Consolas, monospace",
     '--bg-deep': '#16161e',
     '--bg-dark': '#1a1b26',
     '--bg-card': 'rgba(26, 27, 38, 0.7)',
