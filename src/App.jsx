@@ -1304,7 +1304,7 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="toggle-row">
+              {/* <div className="toggle-row">
                 <div className="toggle-details">
                   <span className="toggle-title">Mono Font</span>
                   <span className="toggle-desc">Technical metadata mode — render the whole UI in a monospace font.</span>
@@ -1313,7 +1313,7 @@ export default function App() {
                   <input type="checkbox" checked={!!themeSettings.monoFont} onChange={(e) => handleThemeSetting({ monoFont: e.target.checked })} />
                   <span className="slider"></span>
                 </label>
-              </div>
+              </div> */}
             </div>
 
             <div style={{ padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
