@@ -25,11 +25,14 @@
 | | |
 |---|---|
 | 🔌 **Plugin system** | Enable/disable any tool; import community plugins as plain `.js` files |
-| 🎯 **Auto-detection** | Paste any URL; XtractForge picks the right plugin automatically |
-| 📊 **Download queue** | Real-time progress, speed, ETA, concurrent downloads, cancel |
+| 🎯 **Auto-detection** | Paste any URL; XtractForge picks the right plugin automatically (or force one) |
+| 📊 **Download queue** | Live progress, speed, ETA, pause/resume, reorder, expandable console output |
+| ↩️ **Resumable** | Downloads stage in a temp folder so interrupted yt-dlp/curl transfers resume |
+| 🗂️ **Organize output** | Keep files flat, or sort into folders by type or source; playlists nest automatically |
 | 🎞️ **Format picker** | Quality presets, audio-only (MP3/M4A/WAV), or raw format selection |
-| ⚙️ **Per-plugin config** | Binary paths, cookies, bitrate — all configurable in Settings |
-| 🎨 **Themes** | Switch visual modes, override accent color, tune glass intensity; import community themes as `.js` files |
+| ⚙️ **Per-plugin config** | Binary paths, cookies, bitrate — each plugin has its own settings page |
+| 🎨 **Themes** | Switch visual modes, override accent color, tune glass/typography; import community themes as `.js` files |
+| 🌍 **i18n** | English & Spanish UI (one file per language) |
 | 🌑 **Glassmorphic UI** | Native macOS/Windows/Linux window chrome, light & dark built-in themes |
 
 ---
