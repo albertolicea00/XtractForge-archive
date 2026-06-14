@@ -1,6 +1,6 @@
 {
   "name": "xtractforge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "packageManager": "pnpm@11.5.2",
   "description": "Cross-platform desktop media downloader with a plugin architecture (yt-dlp, gallery-dl, spotDL, Lux, ffmpeg, curl).",
   "main": "electron/main.js",
