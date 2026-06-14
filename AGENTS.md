@@ -290,6 +290,9 @@ pnpm package:all
 > `git push`, `pnpm release:*`, `npm version`, `gh release`, or create tags on your own.
 > Commits stay local until the user says to push. A release is only triggered when the
 > user explicitly requests it.
+>
+> ✅ **Run `pnpm test` after every commit, and again before pushing.** The suite must be
+> green before any push or release; if it fails, fix it first.
 
 - `.github/workflows/ci.yml` — on PR / push to `main`: `pnpm install --frozen-lockfile --ignore-scripts`, then `pnpm test` + `pnpm build`.
 - `.github/workflows/release.yml` — on `push tag v*.*.*`: matrix (mac/win/linux) runs `electron-builder --<os> --publish always` (GitHub provider) → creates the Release and uploads dmg/exe/AppImage/deb.
@@ -313,7 +316,3 @@ pnpm package:all
 2. `require` it in `electron/theme-manager.js` and add it to `BUILTIN_THEMES`
 3. Define `variables` covering the color/bg/text/border/gradient/shadow vars from `src/index.css :root`
 4. Verify it renders by selecting it in the Themes tab
-
----
-
-#
