@@ -1633,21 +1633,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Per-plugin config lives in each plugin's own page */}
-            <div className="info-banner" style={{ margin: 0 }}>
-              <Sliders size={18} />
-              <div style={{ flex: 1 }}>
-                <strong>Configuring download tools</strong>
-                <p style={{ fontSize: '12px', marginTop: '2px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                  Each CLI tool (yt-dlp, spotDL, gallery-dl, Lux…) has its own settings — binary path, format, cookies, etc.
-                  Open the <strong>Plugins</strong> tab, pick a plugin, and click <strong>Settings</strong>.
-                </p>
-              </div>
-              <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => { setActiveTab('plugins'); setSelectedPlugin(null); }}>
-                <Puzzle size={14} /> Open Plugins
-              </button>
-            </div>
-
             {/* Updates */}
             <div className="glass-card">
               <h3 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '4px' }}>Updates</h3>
@@ -1688,6 +1673,22 @@ export default function App() {
                 )}
               </div>
             </div>
+
+            {/* Per-plugin config lives in each plugin's own page */}
+            <div className="info-banner" style={{ margin: 0 }}>
+              <Sliders size={18} />
+              <div style={{ flex: 1 }}>
+                <strong>Configuring download tools</strong>
+                <p style={{ fontSize: '12px', marginTop: '2px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  Each CLI tool (yt-dlp, spotDL, gallery-dl, Lux…) has its own settings — binary path, format, cookies, etc.
+                  Open the <strong>Plugins</strong> tab, pick a plugin, and click <strong>Settings</strong>.
+                </p>
+              </div>
+              <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => { setActiveTab('plugins'); setSelectedPlugin(null); }}>
+                <Puzzle size={14} /> Open Plugins
+              </button>
+            </div>
+
           </div>
         )}
       </main>
