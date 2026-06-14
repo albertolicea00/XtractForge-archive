@@ -68,6 +68,13 @@ Every plugin is a CommonJS module (`module.exports = { ... }`) with these fields
 }
 ```
 
+**Plugin-driven Download view:** `getInfo` may return `data._downloadOptions` — a
+declarative field schema (`[{ key, label, type: 'text'|'toggle'|'select', default,
+options?, placeholder?, help? }]`). The renderer renders these in the Download tab
+and passes the chosen values back to `buildDownloadArgs` as `options.pluginOptions`.
+Return `data._simpleDownload: true` for a no-options direct download. This keeps each
+plugin's download UI declared by the plugin itself (no UI code crosses the bridge).
+
 **InfoResult shape:**
 ```js
 {

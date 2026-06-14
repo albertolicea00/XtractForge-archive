@@ -74,14 +74,18 @@ module.exports = {
         view_count: null,
         formats: [],
         _plugin: 'ffmpeg',
-        _simpleDownload: true,
+        // Plugin-declared Download view: the renderer renders these fields and
+        // passes the values back in options.pluginOptions.
+        _downloadOptions: [
+          { key: 'container', label: 'Output container', type: 'select', default: config.ffmpegContainer || 'mp4', options: ['mp4', 'mkv', 'ts'], help: 'File format for the recorded stream. mp4 is the most compatible.' },
+        ],
       },
     });
   },
 
   buildDownloadArgs(url, options, config) {
     const bin = config.ffmpegPath || 'ffmpeg';
-    const container = config.ffmpegContainer || 'mp4';
+    const container = (options.pluginOptions && options.pluginOptions.container) || config.ffmpegContainer || 'mp4';
     const out = path.join(options.downloadFolder || '.', `${nameFromUrl(url)}.${container}`);
     // -stats prints progress to stderr; -c copy avoids re-encoding when possible
     const args = ['-y', '-stats', '-i', url, '-c', 'copy'];
