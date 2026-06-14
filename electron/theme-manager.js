@@ -8,8 +8,13 @@ const BUILTIN_THEMES = [
   require('./themes/alexandria'),
   require('./themes/matrix'),
   require('./themes/dracula'),
-  require('./themes/nord'),
   require('./themes/solarized-light'),
+  require('./themes/gruvbox-dark'),
+  require('./themes/tokyo-night'),
+  require('./themes/catppuccin-mocha'),
+  require('./themes/monokai'),
+  require('./themes/catppuccin-latte'),
+  require('./themes/github-light'),
 ];
 
 // All loaded themes (builtin + external) keyed by theme.id, insertion-ordered.
