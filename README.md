@@ -56,6 +56,13 @@ XtractForge ships with these plugins out of the box:
 
 ## ⬇️ Download
 
+<div style="border-left: 4px solid #f39c12; padding: 8px 12px;">
+<strong>⚠️ Beta Notice:</strong>
+The current version is still in beta.<br>
+Package manager distributions will be published once they are ready.<br>
+Please avoid using <b>brew</b>, <b>choco</b>, <b>winget</b> or <b>snap</b> for now.
+</div>
+
 ### 🍎 macOS
 
 ```bash
@@ -63,8 +70,9 @@ XtractForge ships with these plugins out of the box:
 brew install --cask xtractforge
 ```
 
-Or download directly:
-[**📦 XtractForge-mac.dmg**](https://github.com/albertolicea00/XtractForge/releases/latest/download/XtractForge-mac.dmg) · [🗜️ XtractForge-mac.zip](https://github.com/albertolicea00/XtractForge/releases/latest/download/XtractForge-mac.zip)
+or **[⬇️ Download the latest release](https://github.com/albertolicea00/XtractForge/releases/latest)** — then grab:
+- `XtractForge-<version>-arm64.dmg` — Apple Silicon (M1/M2/M3…)
+- `XtractForge-<version>.dmg` — Intel
 
 > Requires macOS 11 (Big Sur) or later. Apple Silicon and Intel supported.
 
@@ -80,8 +88,9 @@ winget install albertolicea00.XtractForge
 choco install xtractforge
 ```
 
-Or download directly:
-[**📦 XtractForge-win-setup.exe**](https://github.com/albertolicea00/XtractForge/releases/latest/download/XtractForge-win-setup.exe) · [🗜️ XtractForge-win-portable.zip](https://github.com/albertolicea00/XtractForge/releases/latest/download/XtractForge-win-portable.zip)
+or **[⬇️ Download the latest release](https://github.com/albertolicea00/XtractForge/releases/latest)** — then grab:
+- `XtractForge-Setup-<version>.exe` — installer
+- `XtractForge-<version>-win.zip` — portable
 
 > Requires Windows 10 or later (64-bit).
 
@@ -102,8 +111,9 @@ chmod +x XtractForge-linux.AppImage
 ./XtractForge-linux.AppImage
 ```
 
-Or download directly:
-[**📦 XtractForge-linux.AppImage**](https://github.com/albertolicea00/XtractForge/releases/latest/download/XtractForge-linux.AppImage) · [📦 XtractForge-linux.deb](https://github.com/albertolicea00/XtractForge/releases/latest/download/XtractForge-linux.deb)
+or **[⬇️ Download the latest release](https://github.com/albertolicea00/XtractForge/releases/latest)** — then grab:
+- `XtractForge-<version>.AppImage` — portable (chmod +x, then run)
+- `xtractforge_<version>_amd64.deb` — Debian/Ubuntu
 
 > Tested on Ubuntu 22.04+, Fedora 38+, Arch Linux.
 
