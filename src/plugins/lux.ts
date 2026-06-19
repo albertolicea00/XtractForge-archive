@@ -1,5 +1,3 @@
-const { spawn, execSync } = require('child_process');
-
 const HANDLED_SITES = [
   'bilibili.com', 'douyin.com', 'kuaishou.com', 'weibo.com',
   'mgtv.com', 'iqiyi.com', 'youku.com', 'v.qq.com', 'acfun.cn',
@@ -7,7 +5,7 @@ const HANDLED_SITES = [
   'twitter.com', 'x.com', 'instagram.com',
 ];
 
-module.exports = {
+export default {
   id: 'lux',
   name: 'Lux',
   order: 6,
@@ -41,73 +39,63 @@ module.exports = {
     { key: 'luxMultiThread', label: 'Multi-thread download', type: 'toggle', default: false, help: 'Download with multiple threads for higher speed. May be rejected by some sites.' },
   ],
 
-  checkDependency(config) {
+  async checkDependency(config: any) {
     const bin = config.luxPath || 'lux';
     try {
-      const out = execSync(`"${bin}" --version 2>&1`, { encoding: 'utf8', timeout: 3000 });
-      return { available: true, version: out.trim().split('\n')[0] };
+      const res = await window.api.execCommand(bin, ['--version']);
+      return { available: res.success, version: res.stdout.trim().split('\n')[0] };
     } catch {
       return { available: false, version: '' };
     }
   },
 
-  canHandle(url) {
+  canHandle(url: string) {
     return HANDLED_SITES.some(site => url.includes(site));
   },
 
-  getInfo(url, config) {
-    return new Promise((resolve, reject) => {
-      const bin = config.luxPath || 'lux';
-      const args = ['-j', url];
-      let stdout = '';
-      let stderr = '';
-      const proc = spawn(bin, args);
-      proc.stdout.on('data', d => { stdout += d.toString(); });
-      proc.stderr.on('data', d => { stderr += d.toString(); });
-      proc.on('close', code => {
-        if (code === 0) {
-          try {
-            // lux -j outputs an array
-            const rawArr = JSON.parse(stdout);
-            const raw = Array.isArray(rawArr) ? rawArr[0] : rawArr;
-            const streams = Object.entries(raw.streams || {});
-            const formats = streams.map(([id, s]) => ({
-              format_id: id,
-              ext: s.ext || 'mp4',
-              resolution: s.quality || 'unknown',
-              filesize: s.size || null,
-              filesize_approx: null,
-              fps: null,
-              format_note: s.quality || id,
-              vcodec: 'unknown',
-            }));
-            resolve({
-              success: true,
-              data: {
-                title: raw.title || 'Untitled',
-                thumbnail: raw.thumbnail || '',
-                thumbnails: raw.thumbnail ? [{ url: raw.thumbnail }] : [],
-                duration: 0,
-                uploader: raw.author || '',
-                channel: raw.author || '',
-                view_count: null,
-                formats,
-                _plugin: 'lux',
-                _raw: raw,
-              },
-            });
-          } catch (e) {
-            reject(new Error('Failed to parse lux output: ' + e.message));
-          }
-        } else {
-          reject(new Error(stderr.trim() || `lux exited with code ${code}`));
-        }
-      });
-      proc.on('error', err => reject(new Error(`Failed to run lux: ${err.message}`)));
-    });
+  async getInfo(url: string, config: any) {
+    const bin = config.luxPath || 'lux';
+    const args = ['-j', url];
+    try {
+      const res = await window.api.execCommand(bin, args);
+      if (res.success) {
+        const rawArr = JSON.parse(res.stdout);
+        const raw = Array.isArray(rawArr) ? rawArr[0] : rawArr;
+        const streams = Object.entries(raw.streams || {});
+        const formats = streams.map(([id, s]: [string, any]) => ({
+          format_id: id,
+          ext: s.ext || 'mp4',
+          resolution: s.quality || 'unknown',
+          filesize: s.size || null,
+          filesize_approx: null,
+          fps: null,
+          format_note: s.quality || id,
+          vcodec: 'unknown',
+        }));
+        return {
+          success: true,
+          data: {
+            title: raw.title || 'Untitled',
+            thumbnail: raw.thumbnail || '',
+            thumbnails: raw.thumbnail ? [{ url: raw.thumbnail }] : [],
+            duration: 0,
+            uploader: raw.author || '',
+            channel: raw.author || '',
+            view_count: null,
+            formats,
+            _plugin: 'lux',
+            _raw: raw,
+          },
+        };
+      } else {
+        throw new Error(res.stderr || `lux exited with error`);
+      }
+    } catch (e: any) {
+      throw new Error(`Failed to run lux: ${e.message}`);
+    }
   },
 
-  buildDownloadArgs(url, options, config) {
+  buildDownloadArgs(url: string, options: any, config: any) {
     const bin = config.luxPath || 'lux';
     const args = [];
 
@@ -129,7 +117,7 @@ module.exports = {
     return { binary: bin, args };
   },
 
-  parseProgress(line) {
+  parseProgress(line: string) {
     const pctMatch = /([\d.]+)%/.exec(line);
     if (!pctMatch) return null;
     const speedMatch = /([\d.]+\s*\w+\/s)/i.exec(line);

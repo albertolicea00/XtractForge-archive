@@ -1,12 +1,11 @@
-const { spawn, execSync } = require('child_process');
-const path = require('path');
+const path = {
+  join: (...parts: string[]) => parts.filter(Boolean).join('/').replace(/\/+/g, '/')
+};
 
-// Common direct-file extensions curl should grab (not pages, not streams).
 const FILE_EXT = /\.(mp4|mkv|webm|mov|avi|flv|mp3|m4a|aac|flac|wav|ogg|opus|zip|rar|7z|pdf|jpg|jpeg|png|gif|webp|apk|dmg|exe|iso|gz|tar)(\?|#|$)/i;
-// Streaming manifests are ffmpeg's job, not curl's.
 const STREAM = /\.(m3u8|mpd)(\?|#|$)|^rtmps?:|^rtsp:/i;
 
-function filenameFromUrl(url) {
+function filenameFromUrl(url: string): string {
   try {
     const u = new URL(url);
     const base = decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || '');
@@ -16,7 +15,7 @@ function filenameFromUrl(url) {
   }
 }
 
-module.exports = {
+export default {
   id: 'curl',
   name: 'curl',
   order: 1,
@@ -39,12 +38,12 @@ module.exports = {
     },
   },
 
-  checkDependency(config) {
+  async checkDependency(config: any) {
     const bin = config.curlPath || 'curl';
     try {
-      const out = execSync(`"${bin}" --version`, { encoding: 'utf8', timeout: 3000 });
-      const m = out.match(/curl\s+([\d.]+)/i);
-      return { available: true, version: m ? m[1] : out.split('\n')[0] };
+      const res = await window.api.execCommand(bin, ['--version']);
+      const m = res.stdout.match(/curl\s+([\d.]+)/i);
+      return { available: res.success, version: m ? m[1] : res.stdout.split('\n')[0] };
     } catch {
       return { available: false, version: '' };
     }
@@ -54,13 +53,12 @@ module.exports = {
     { key: 'curlPath', label: 'curl binary path', type: 'text', default: 'curl', placeholder: '/usr/bin/curl', help: "Path to the curl executable. Leave as 'curl' if it's on your PATH." },
   ],
 
-  canHandle(url) {
+  canHandle(url: string) {
     if (STREAM.test(url)) return false;
     return FILE_EXT.test(url);
   },
 
-  getInfo(url, config) {
-    // No metadata service — return a minimal stub so the UI can show a title.
+  getInfo(url: string, config: any) {
     const name = filenameFromUrl(url);
     return Promise.resolve({
       success: true,
@@ -74,8 +72,6 @@ module.exports = {
         view_count: null,
         formats: [],
         _plugin: 'curl',
-        // curl downloads the file as-is — it can't transcode. Let the user pick
-        // the saved filename/extension only.
         _downloadOptions: [
           { key: 'filename', label: 'Save as', type: 'text', default: name, placeholder: name, help: "curl saves the file as-is; it does not convert formats. Change the name/extension only." },
         ],
@@ -83,11 +79,10 @@ module.exports = {
     });
   },
 
-  buildDownloadArgs(url, options, config) {
+  buildDownloadArgs(url: string, options: any, config: any) {
     const bin = config.curlPath || 'curl';
     const name = (options.pluginOptions && options.pluginOptions.filename) || filenameFromUrl(url);
     const out = path.join(options.downloadFolder || '.', name);
-    // -L follow redirects, -o output, --create-dirs; -C - resumes a partial file
     const args = ['-L', '--create-dirs'];
     if (options.resume) args.push('-C', '-');
     args.push('-o', out, url);
@@ -97,8 +92,7 @@ module.exports = {
     return { binary: bin, args };
   },
 
-  parseProgress(line) {
-    // Default curl meter: "% Total ... " — first integer is the percentage.
+  parseProgress(line: string) {
     const m = line.match(/^\s*(\d{1,3})\b/);
     if (!m) return null;
     const pct = parseInt(m[1], 10);

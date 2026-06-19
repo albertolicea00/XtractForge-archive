@@ -1,5 +1,3 @@
-const { spawn, execSync } = require('child_process');
-
 const HANDLED_SITES = [
   'deviantart.com', 'pixiv.net', 'danbooru.donmai.us', 'artstation.com',
   'flickr.com', 'reddit.com', 'instagram.com', 'twitter.com', 'x.com',
@@ -8,7 +6,7 @@ const HANDLED_SITES = [
   'furaffinity.net', 'e621.net', 'newgrounds.com', 'imgur.com',
 ];
 
-module.exports = {
+export default {
   id: 'gallery-dl',
   name: 'gallery-dl',
   order: 4,
@@ -42,22 +40,21 @@ module.exports = {
     { key: 'galleryDlConfig', label: 'Config file (optional)', type: 'text', default: '', placeholder: '/path/to/gallery-dl.conf', help: 'Path to a custom gallery-dl config file for advanced per-site options.' },
   ],
 
-  checkDependency(config) {
+  async checkDependency(config: any) {
     const bin = config.galleryDlPath || 'gallery-dl';
     try {
-      const out = execSync(`"${bin}" --version`, { encoding: 'utf8', timeout: 3000 });
-      return { available: true, version: out.trim() };
+      const res = await window.api.execCommand(bin, ['--version']);
+      return { available: res.success, version: res.stdout.trim() };
     } catch {
       return { available: false, version: '' };
     }
   },
 
-  canHandle(url) {
+  canHandle(url: string) {
     return HANDLED_SITES.some(site => url.includes(site));
   },
 
-  // gallery-dl has no clean JSON info mode — synthesize a stub
-  getInfo(url, config) {
+  getInfo(url: string, config: any) {
     const slug = url.replace(/^https?:\/\//, '').replace(/\/$/, '').split('/').slice(-2).join('/');
     const site = HANDLED_SITES.find(s => url.includes(s)) || 'gallery';
     return Promise.resolve({
@@ -86,7 +83,7 @@ module.exports = {
     });
   },
 
-  buildDownloadArgs(url, options, config) {
+  buildDownloadArgs(url: string, options: any, config: any) {
     const bin = config.galleryDlPath || 'gallery-dl';
     const args = [];
 
@@ -104,8 +101,7 @@ module.exports = {
     return { binary: bin, args };
   },
 
-  parseProgress(line) {
-    // gallery-dl: "#0042 https://..."
+  parseProgress(line: string) {
     const countMatch = /#(\d+)/.exec(line);
     if (!countMatch) return null;
     return {

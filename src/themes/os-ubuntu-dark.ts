@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-ubuntu-dark',
   name: 'Ubuntu Dark',
   description: 'Yaru-inspired dark mode with Ubuntu typography and orange accents.',

@@ -1,7 +1,8 @@
-const { spawn, execSync } = require('child_process');
-const path = require('path');
+const path = {
+  join: (...parts: string[]) => parts.filter(Boolean).join('/').replace(/\/+/g, '/')
+};
 
-module.exports = {
+export default {
   id: 'spotdl',
   name: 'spotDL',
   order: 5,
@@ -35,21 +36,21 @@ module.exports = {
     { key: 'spotdlBitrate', label: 'Bitrate', type: 'select', default: '320k', options: ['128k', '192k', '256k', '320k'], help: 'Target audio bitrate. Higher = better quality and larger files (ignored for lossless formats).' },
   ],
 
-  checkDependency(config) {
+  async checkDependency(config: any) {
     const bin = config.spotdlPath || 'spotdl';
     try {
-      const out = execSync(`"${bin}" --version 2>&1`, { encoding: 'utf8', timeout: 15000 });
-      return { available: true, version: out.trim().split('\n')[0] };
+      const res = await window.api.execCommand(bin, ['--version']);
+      return { available: res.success, version: res.stdout.trim().split('\n')[0] };
     } catch {
       return { available: false, version: '' };
     }
   },
 
-  canHandle(url) {
+  canHandle(url: string) {
     return url.includes('open.spotify.com') || url.startsWith('spotify:');
   },
 
-  getInfo(url, config) {
+  getInfo(url: string, config: any) {
     const isPlaylist = url.includes('/playlist/');
     const isAlbum = url.includes('/album/');
     const isArtist = url.includes('/artist/');
@@ -87,7 +88,7 @@ module.exports = {
     });
   },
 
-  buildDownloadArgs(url, options, config) {
+  buildDownloadArgs(url: string, options: any, config: any) {
     const bin = config.spotdlPath || 'spotdl';
     const fmt = config.spotdlFormat || 'mp3';
     const bitrate = config.spotdlBitrate || '320k';
@@ -103,7 +104,7 @@ module.exports = {
     return { binary: bin, args };
   },
 
-  parseProgress(line) {
+  parseProgress(line: string) {
     if (line.includes('Downloaded') || line.includes('Skipping')) {
       return { percent: 100, size: '', speed: '', eta: '' };
     }

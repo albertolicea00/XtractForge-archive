@@ -2,10 +2,10 @@
 
 <div align="center">
 
-![Electron](https://img.shields.io/badge/Electron-33-47848F?logo=electron&logoColor=white)
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8D8?logo=tauri&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-6-646CFF?logo=vite&logoColor=white)
-![Node.js](https://img.shields.io/badge/Node.js-16+-339933?logo=nodedotjs&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-1.77+-000000?logo=rust&logoColor=white)
 ![pnpm](https://img.shields.io/badge/pnpm-workspace-F69220?logo=pnpm&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)
@@ -16,7 +16,7 @@
 
 ---
 
-**XtractForge** is a modern, open-source, cross-platform desktop app for downloading media from anywhere — YouTube, Spotify, Bilibili, DeviantArt, image galleries, and 1000+ more sites. Built on **Electron + React + Vite** with a **plugin architecture**: every downloader is a hot-swappable plugin. Enable what you need, disable what you don't, and import community-built plugins with one click.
+**XtractForge** is a modern, open-source, cross-platform desktop app for downloading media from anywhere — YouTube, Spotify, Bilibili, DeviantArt, image galleries, and 1000+ more sites. Built on **Tauri + React + Vite** with a **plugin architecture**: every downloader is a hot-swappable plugin. Enable what you need, disable what you don't, and import community-built plugins with one click.
 
 ---
 
@@ -159,16 +159,24 @@ Contributions of all kinds are welcome — bug fixes, new plugins, UI improvemen
 ## 🏗️ Architecture
 
 ```
-electron/
-  main.js              Main process — IPC handlers, plugin dispatch, settings
-  preload.js           Secure IPC bridge (contextBridge)
-  plugin-manager.js    Plugin registry, URL routing, dependency checks, external loading
-  theme-manager.js     Theme registry + external theme loading
-  plugins/             Built-in plugins (one self-contained .js file each)
-  themes/              Built-in themes (one .js file each)
+src-tauri/
+  Cargo.toml           Rust crate manifest
+  build.rs             Tauri build script
+  src/
+    main.rs            Core Tauri process entry point, registers commands and state
+    commands.rs        Tauri command implementations (file IO, system utilities, settings)
+    downloader.rs      Tauri async downloader command + state management
 src/
   App.jsx              React UI — Download, Queue, Plugins, Themes, Settings tabs
-  lib/                 Pure helpers (format, theme, plugins, queue)
+  main.jsx             React entry point
+  lib/
+    tauri-bridge.ts    Exposes window.api IPC bridge to coordinate with Rust Tauri commands
+    plugin-loader.ts   Frontend plugin manager, sandbox executor (CommonJS mock)
+    format.js          Format helpers (sizes, speeds, durations)
+    theme.js           Theme state application
+    queue.js           Download queue management logic
+  plugins/             Built-in plugins (TypeScript modules)
+  themes/              Built-in themes (TypeScript modules)
   locales/             i18n strings, one file per language
   index.css            Theme variables + base styles
 tests/                 Vitest suite (lib, plugins, managers)

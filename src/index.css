@@ -2,7 +2,7 @@
 
 :root {
   /* Default = XtractForge Default theme (Nord surfaces, emerald accent, mono).
-     Matches electron/themes/xtractforge-default.js so the first paint is correct. */
+     Matches the default built-in theme parameters so the first paint is correct. */
   --font-sans: 'SFMono-Regular', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 
   /* Color Palette */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-const pm = require('../electron/plugin-manager');
+import { pluginManager as pm } from '../src/lib/plugin-loader';
 
 describe('getDownloaderForUrl', () => {
   it('routes to the specific plugin per URL', () => {

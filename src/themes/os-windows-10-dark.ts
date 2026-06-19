@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-windows-10-dark',
   name: 'Windows 10 Dark',
   description: 'Flatter Fluent Design dark mode with square corners and Segoe UI typography.',

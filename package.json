@@ -3,117 +3,39 @@
   "version": "1.2.0",
   "packageManager": "pnpm@11.5.2",
   "description": "Cross-platform desktop media downloader with a plugin architecture (yt-dlp, gallery-dl, spotDL, Lux, ffmpeg, curl).",
-  "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development electron .\"",
+    "tauri": "tauri",
+    "dev": "tauri dev",
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package:mac": "npm run build && electron-builder --mac",
-    "package:win": "npm run build && electron-builder --win",
-    "package:linux": "npm run build && electron-builder --linux",
-    "package:all": "npm run build && electron-builder --mac --win --linux",
-    "release:patch": "npm version patch && git push --follow-tags && gh release create $(git describe --tags --abbrev=0) --generate-notes && gh release view $(git describe --tags --abbrev=0) --web",
-    "release:minor": "npm version minor && git push --follow-tags && gh release create $(git describe --tags --abbrev=0) --generate-notes && gh release view $(git describe --tags --abbrev=0) --web",
-    "release:major": "npm version major && git push --follow-tags && gh release create $(git describe --tags --abbrev=0) --generate-notes && gh release view $(git describe --tags --abbrev=0) --web"
+    "package:mac": "tauri build",
+    "package:win": "tauri build",
+    "package:linux": "tauri build",
+    "package:all": "tauri build"
   },
   "keywords": [
     "yt-dlp",
     "downloader",
     "gui",
-    "electron",
+    "tauri",
     "react",
     "youtube-dl"
   ],
   "author": "albertolicea00",
   "license": "MIT",
   "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
     "lucide-react": "^0.454.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
-    "concurrently": "^9.1.0",
-    "cross-env": "^7.0.3",
-    "electron": "^33.2.1",
-    "electron-builder": "^24.13.3",
     "vite": "^6.0.3",
     "vitest": "^4.1.8"
-  },
-  "build": {
-    "appId": "com.xtractforge.app",
-    "productName": "XtractForge",
-    "directories": {
-      "output": "dist-package"
-    },
-    "publish": {
-      "provider": "github",
-      "owner": "albertolicea00",
-      "repo": "XtractForge",
-      "releaseType": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "icons/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "category": "public.app-category.utilities",
-      "icon": "icons/AppIcon.icns",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64"
-          ]
-        }
-      ]
-    },
-    "win": {
-      "icon": "icons/AppIcon256.png",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "linux": {
-      "icon": "icons/AppIcon512.png",
-      "maintainer": "albertolicea00 <albertolicea00@users.noreply.github.com>",
-      "category": "Utility",
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    }
   }
 }

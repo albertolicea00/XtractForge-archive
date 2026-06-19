@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-macos-light',
   name: 'macOS Light',
   description: 'Aqua inspired light mode, high vibrancy, standard native spacing, and SF Pro typography.',

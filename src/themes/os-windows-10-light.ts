@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-windows-10-light',
   name: 'Windows 10 Light',
   description: 'Flatter Fluent Design light mode with square corners and Segoe UI typography.',

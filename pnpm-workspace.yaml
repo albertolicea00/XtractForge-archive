@@ -1,3 +1,5 @@
+allowBuilds:
+  esbuild: set this to true or false
 # Single-package repo. This file approves native build scripts
 # (pnpm 10+ blocks postinstall scripts unless listed here).
 onlyBuiltDependencies:

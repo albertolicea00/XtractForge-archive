@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-macos-dark',
   name: 'macOS Dark',
   description: 'Aqua inspired dark mode, high vibrancy, standard native spacing, and SF Pro typography.',
