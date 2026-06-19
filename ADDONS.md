@@ -111,7 +111,7 @@ module.exports = {
 };
 ```
 
-See [electron/plugins/ytdlp.js](electron/plugins/ytdlp.js) for a full reference implementation.
+See [src/plugins/ytdlp.ts](src/plugins/ytdlp.ts) for a full reference implementation.
 
 ---
 
@@ -142,7 +142,7 @@ module.exports = {
   author: 'you',
   mode: 'dark',                          // 'dark' | 'light'
   swatches: ['#8b5cf6', '#d946ef', '#16161d'],  // 3 preview dots
-
+ 
   // CSS custom properties applied to :root (see src/index.css for the full list)
   variables: {
     '--primary': '#8b5cf6',
@@ -156,4 +156,4 @@ module.exports = {
 };
 ```
 
-Install: drop it in the Themes Folder (**Themes tab → Themes Folder**) or click **Import Theme**. See [electron/themes/cyber-glass.js](electron/themes/cyber-glass.js) for a full reference.
+Install: drop it in the Themes Folder (**Themes tab → Themes Folder**) or click **Import Theme**. See [src/themes/os-macos-dark.ts](src/themes/os-macos-dark.ts) for a full reference.

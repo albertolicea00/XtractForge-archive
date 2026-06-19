@@ -1,10 +1,10 @@
-const { spawn, execSync } = require('child_process');
-const path = require('path');
+const path = {
+  join: (...parts: string[]) => parts.filter(Boolean).join('/').replace(/\/+/g, '/')
+};
 
-// HLS / DASH manifests and live stream protocols ffmpeg can record.
 const STREAM = /\.(m3u8|mpd)(\?|#|$)|^rtmps?:\/\/|^rtsp:\/\//i;
 
-function nameFromUrl(url) {
+function nameFromUrl(url: string): string {
   try {
     const u = new URL(url);
     const base = (u.pathname.split('/').filter(Boolean).pop() || 'stream').replace(/\.(m3u8|mpd)$/i, '');
@@ -14,7 +14,7 @@ function nameFromUrl(url) {
   }
 }
 
-module.exports = {
+export default {
   id: 'ffmpeg',
   name: 'FFmpeg',
   order: 2,
@@ -26,7 +26,7 @@ module.exports = {
   installHint: 'brew install ffmpeg  OR  see https://ffmpeg.org/download.html',
   install: {
     darwin: 'brew install ffmpeg',
-    win32: 'winget install Gyan.FFmpeg',
+    win32: 'win32: winget install Gyan.FFmpeg',
     linux: 'sudo apt install ffmpeg',
     default: 'see https://ffmpeg.org/download.html',
   },
@@ -41,12 +41,12 @@ module.exports = {
     },
   },
 
-  checkDependency(config) {
+  async checkDependency(config: any) {
     const bin = config.ffmpegPath || 'ffmpeg';
     try {
-      const out = execSync(`"${bin}" -version`, { encoding: 'utf8', timeout: 3000 });
-      const m = out.match(/ffmpeg version (\S+)/i);
-      return { available: true, version: m ? m[1] : out.split('\n')[0] };
+      const res = await window.api.execCommand(bin, ['-version']);
+      const m = res.stdout.match(/ffmpeg version (\S+)/i);
+      return { available: res.success, version: m ? m[1] : res.stdout.split('\n')[0] };
     } catch {
       return { available: false, version: '' };
     }
@@ -57,11 +57,11 @@ module.exports = {
     { key: 'ffmpegContainer', label: 'Output container', type: 'select', default: 'mp4', options: ['mp4', 'mkv', 'ts'], help: 'File format for the recorded stream. mp4 is the most compatible.' },
   ],
 
-  canHandle(url) {
+  canHandle(url: string) {
     return STREAM.test(url);
   },
 
-  getInfo(url, config) {
+  getInfo(url: string, config: any) {
     return Promise.resolve({
       success: true,
       data: {
@@ -74,8 +74,6 @@ module.exports = {
         view_count: null,
         formats: [],
         _plugin: 'ffmpeg',
-        // Plugin-declared Download view: the renderer renders these fields and
-        // passes the values back in options.pluginOptions.
         _downloadOptions: [
           { key: 'container', label: 'Output container', type: 'select', default: config.ffmpegContainer || 'mp4', options: ['mp4', 'mkv', 'ts'], help: 'File format for the recorded stream. mp4 is the most compatible.' },
         ],
@@ -83,19 +81,17 @@ module.exports = {
     });
   },
 
-  buildDownloadArgs(url, options, config) {
+  buildDownloadArgs(url: string, options: any, config: any) {
     const bin = config.ffmpegPath || 'ffmpeg';
     const container = (options.pluginOptions && options.pluginOptions.container) || config.ffmpegContainer || 'mp4';
     const out = path.join(options.downloadFolder || '.', `${nameFromUrl(url)}.${container}`);
-    // -stats prints progress to stderr; -c copy avoids re-encoding when possible
     const args = ['-y', '-stats', '-i', url, '-c', 'copy'];
     if (container === 'mp4') args.push('-bsf:a', 'aac_adtstoasc');
     args.push(out);
     return { binary: bin, args };
   },
 
-  parseProgress(line) {
-    // ffmpeg has no total for live streams; surface elapsed time + speed instead.
+  parseProgress(line: string) {
     const time = line.match(/time=(\d{2}:\d{2}:\d{2})/);
     const speed = line.match(/speed=\s*([\d.]+x)/);
     if (!time && !speed) return null;

@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-ubuntu-light',
   name: 'Ubuntu Light',
   description: 'Yaru-inspired light mode with Ubuntu typography and orange accents.',

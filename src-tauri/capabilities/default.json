@@ -1,0 +1,15 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema-capability.json",
+  "identifier": "default",
+  "description": "Default capabilities for the XtractForge application",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "core:path:allow-app-data-dir",
+    "core:path:allow-download-dir"
+  ]
+}

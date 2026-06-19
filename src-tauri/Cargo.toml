@@ -1,0 +1,20 @@
+[package]
+name = "xtractforge"
+version = "1.2.0"
+description = "Cross-platform desktop media downloader with a plugin architecture"
+authors = ["albertolicea00"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.3" }
+
+[dependencies]
+tauri = { version = "2.0.3" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.37", features = ["full"] }
+open = "5.1"
+fs2 = "0.4"
+dirs = "5.0"
+rfd = "0.14"
+libc = "0.2"

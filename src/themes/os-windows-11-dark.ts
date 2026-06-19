@@ -1,4 +1,4 @@
-module.exports = {
+export default {
   id: 'os-windows-11-dark',
   name: 'Windows 11 Dark',
   description: 'Fluent Design dark mode with rounded corners and Segoe UI typography.',

@@ -1,0 +1,37 @@
+{
+  "productName": "XtractForge",
+  "version": "1.2.0",
+  "identifier": "com.xtractforge.app",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "XtractForge",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 900,
+        "minHeight": 640,
+        "resizable": true,
+        "decorations": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "../icons/AppIcon256.png",
+      "../icons/AppIcon512.png"
+    ],
+    "publisher": "albertolicea00",
+    "category": "Utility"
+  }
+}

@@ -6,29 +6,27 @@ Technical reference for the XtractForge codebase. Start here before touching any
 
 ## Application Architecture
 
-XtractForge runs on Electron's two-process model:
+XtractForge runs on Tauri's multi-process model:
 
-**Main Process** (`electron/main.js`)
-- Full Node.js access: filesystem, child_process, IPC
-- Owns the plugin registry via `electron/plugin-manager.js` and theme registry via `electron/theme-manager.js`
-- Dispatches URL analysis and downloads to the appropriate plugin
-- Persists settings to `<userData>/config.json`
+**Core Process (Rust)** (`src-tauri/`)
+- Full native system access (filesystem, process execution, dialogs).
+- Implements Tauri commands in `src-tauri/src/commands.rs` (file operations, settings persistence, system command execution) and `src-tauri/src/downloader.rs` (downloads state management and child process execution/lifecycle).
+- Persists settings to `config.json` in the OS-specific application data directory.
 
-**Renderer Process** (`src/`)
-- React + Vite, no direct Node.js access (contextIsolation: true)
-- Communicates exclusively via `window.api` (contextBridge)
+**WebView Process** (`src/`)
+- Runs the React UI inside a secure native webview.
 - Layout:
-  - `App.jsx` — shell: owns state/handlers/effects, renders `Sidebar` + the active tab
-  - `components/ErrorBoundary.jsx` — wraps `App` in `main.jsx`; catches render errors so one broken view doesn't blank the app
-  - `components/Sidebar.jsx`, `components/tabs/*Tab.jsx` — presentational; receive state + handlers as props
-  - `lib/` — pure, framework-free helpers (`format`, `theme`, `plugins`, `queue`); unit-tested
-  - `i18n.js` + `locales/<lang>.js` — translations (English fallback)
+  - `App.jsx` — shell: owns state/handlers/effects, renders `Sidebar` + the active tab.
+  - `components/ErrorBoundary.jsx` — wraps `App` in `main.jsx`; catches render errors so one broken view doesn't blank the app.
+  - `components/Sidebar.jsx`, `components/tabs/*Tab.jsx` — presentational; receive state + handlers as props.
+  - `lib/` — pure, framework-free helpers (`format.js`, `theme.js`, `queue.js`), TypeScript core modules (`tauri-bridge.ts`, `plugin-loader.ts`).
+  - `i18n.js` + `locales/<lang>.js` — translations (English fallback).
 
-**Preload Script** (`electron/preload.js`)
-- Exposes a typed subset of IPC as `window.api`
+**Tauri Bridge** (`src/lib/tauri-bridge.ts`)
+- Initialized in the frontend, exposes a typed `window.api` bridge to coordinate with Rust Tauri commands and handle event listeners.
 
 **Tests** (`tests/`, Vitest)
-- Node-side unit tests for `src/lib/`, every built-in plugin (`canHandle`/`parseProgress`/`buildDownloadArgs`/schema), and the plugin & theme managers (routing, registry, config merge)
+- Frontend unit tests for helpers in `src/lib/`, every built-in plugin (`canHandle`/`parseProgress`/`buildDownloadArgs`/schema), and the frontend `plugin-loader` (mocking the sandboxed JS/CJS loader).
 - `pnpm test` (once) · `pnpm test:watch` (on change)
 
 ---
@@ -118,25 +116,25 @@ plugin's download UI declared by the plugin itself (no UI code crosses the bridg
 { title: string, searchQuery: string, description: string, type: 'video' | 'audio' }
 ```
 
-### Plugin Manager (`electron/plugin-manager.js`)
+### Plugin Manager (`src/lib/plugin-loader.ts`)
 
-| Export | Description |
+| Export / Method | Description |
 |---|---|
 | `getDownloaderForUrl(url, disabledList)` | Returns the best plugin for a URL (specific before yt-dlp fallback) |
 | `getPlugin(id)` | Lookup by id |
 | `getAllPlugins()` | `{ downloaders, searchers }` |
 | `getPluginConfig(pluginId, globalConfig)` | Merges `globalConfig.plugins[pluginId]` over `globalConfig` |
-| `checkAllDependencies(globalConfig)` | Calls `checkDependency` on every registered plugin |
-| `loadExternalPlugins(dir)` | Loads all `.js` files from a directory into the registry |
-| `loadPluginFile(filePath)` | Loads a single `.js` file into the registry |
+| `checkAllDependencies(globalConfig)` | Calls `checkDependency` on every registered plugin (asynchronously executing binaries via Tauri command `exec_command`) |
+| `loadExternalPlugins(dir)` | Reads all `.js` files from directory using Tauri `read_external_files` and loads them into registry |
+| `loadPluginFile(filename, content)` | Compiles and loads a plugin into the registry via sandboxed CommonJS mock evaluator |
 
 ### Plugin Loading Order
 
 1. Built-in plugins registered at module load time. Routing order (most specific
    first, yt-dlp catch-all last): spotdl → gallery-dl → lux → ffmpeg → curl → yt-dlp.
    Plugin-card display order is independent — driven by each plugin's `order` field.
-2. External plugins from `<userData>/plugins/` loaded in `initPlugins()` at window creation
-3. User-imported plugins via IPC `browse-plugin-file` → `loadPluginFile`
+2. External plugins from `<appDataDir>/plugins/` loaded in `initTauriBridge()` at application startup
+3. User-imported plugins via Tauri invocation `browsePluginFile` -> `loadPluginFile`
 
 ### URL Routing
 
@@ -172,16 +170,18 @@ Every theme is a CommonJS module (`module.exports = { ... }`):
 }
 ```
 
-### Theme Manager (`electron/theme-manager.js`)
+### Theme Manager (in `src/lib/plugin-loader.ts`)
 
-| Export | Description |
+Theme management is handled by `pluginManager` directly in the frontend:
+
+| Method | Description |
 |---|---|
 | `getTheme(id)` | Lookup by id |
 | `getAllThemes()` | Serializable metadata for every registered theme (incl. `variables`, `css`, `isBuiltin`) |
-| `loadExternalThemes(dir)` | Loads all `.js` files from a directory into the registry |
-| `loadThemeFile(filePath)` | Loads a single `.js` file into the registry |
+| `loadExternalThemes(dir)` | Reads all `.js` files from directory using Tauri `read_external_files` and loads them into registry |
+| `loadThemeFile(filename, content)` | Compiles and loads a theme into the registry via sandboxed CommonJS mock evaluator |
 
-Built-in themes (registered at load): `cyber-glass` (default) → `alexandria` → `matrix`. External themes load from `<userData>/themes/` in `initThemes()` at window creation.
+Built-in themes (registered at load): OS-specific themes (macOS, Windows 10/11, Ubuntu in Light/Dark variants). External themes load from `<appDataDir>/themes/` in `initTauriBridge()` at application startup.
 
 ### Theme Application (renderer)
 
@@ -195,47 +195,58 @@ Because the injected `:root` block comes after `index.css`, it wins on equal spe
 
 ---
 
-## IPC API
+## IPC API Bridge (`src/lib/tauri-bridge.ts`)
 
-All IPC is invoked via `window.api` in the renderer.
+All IPC functions are exposed in the frontend webview as `window.api`. Under the hood, they invoke Tauri commands or register event listeners:
 
 ### Async Methods
 
-| Method | Args | Returns | Description |
+| Method | Tauri Rust Command / Implementation | Returns | Description |
 |---|---|---|---|
-| `checkDependencies()` | — | `Promise<PluginStatusMap>` | All plugins' dep status |
-| `selectFolder()` | — | `Promise<string \| null>` | Native folder picker |
-| `getDefaultDownloadsFolder()` | — | `Promise<string>` | Current download dir |
-| `openFolder(path)` | `path: string` | `Promise<boolean>` | Open in OS file explorer |
-| `getVideoInfo(url)` | `url: string` | `Promise<{ success, data, pluginId }>` | Auto-routed media info |
-| `startDownload(id, url, opts)` | — | `Promise<boolean>` | Start download process |
-| `cancelDownload(id)` | `id: string` | `Promise<boolean>` | SIGTERM the process |
-| `saveSettings(settings)` | `settings: object` | `Promise<boolean>` | Save global config |
-| `getPluginConfigs()` | — | `Promise<object>` | Per-plugin config map |
-| `savePluginConfigs(configs)` | `configs: object` | `Promise<boolean>` | Save per-plugin configs |
-| `setPluginEnabled(id, enabled)` | `id: string, enabled: bool` | `Promise<boolean>` | Toggle plugin on/off |
-| `importPluginFile(path)` | `path: string` | `Promise<{id, success, error}>` | Load plugin from path |
-| `browsePluginFile()` | — | `Promise<{id, success, error} \| null>` | File picker + load |
-| `openPluginsDir()` | — | `Promise<string>` | Open `<userData>/plugins/` |
-| `getThemes()` | — | `Promise<Theme[]>` | All registered themes (metadata + variables) |
-| `getActiveTheme()` | — | `Promise<{ activeTheme, themeSettings }>` | Active theme id + user theme settings |
-| `setActiveTheme(id)` | `id: string` | `Promise<boolean>` | Switch active theme |
-| `saveThemeSettings(s)` | `s: object` | `Promise<boolean>` | Save `{ accentOverride, glassIntensity, monoFont }` |
-| `importThemeFile(path)` | `path: string` | `Promise<{id, success, error}>` | Load theme from path |
-| `browseThemeFile()` | — | `Promise<{id, success, error} \| null>` | File picker + load |
-| `openThemesDir()` | — | `Promise<string>` | Open `<userData>/themes/` |
+| `checkDependencies()` | Frontend evaluates plugins asynchronously using `exec_command` | `Promise<PluginStatusMap>` | All plugins' dependency status |
+| `selectFolder()` | `select_folder` | `Promise<string \| null>` | Native directory selection dialog |
+| `getDefaultDownloadsFolder()` | `get_settings` -> `downloadFolder` or falls back to system download path | `Promise<string>` | Current download directory |
+| `openFolder(path)` | `open_folder` | `Promise<boolean>` | Open file in OS file explorer |
+| `getVideoInfo(url)` | Frontend routes URL to corresponding plugin `getInfo` | `Promise<{ success, data, pluginId }>` | Auto-routed media info |
+| `startDownload(id, url, opts)`| `start_download` | `Promise<boolean>` | Spawns download process in background |
+| `cancelDownload(id)` | `cancel_download` | `Promise<boolean>` | SIGTERM/start_kill the process |
+| `pauseDownload(id)` | `pause_download` | `Promise<boolean>` | Sends SIGSTOP (Unix only) |
+| `resumeDownload(id)` | `resume_download` | `Promise<boolean>` | Sends SIGCONT (Unix only) |
+| `saveSettings(settings)` | `save_settings` | `Promise<boolean>` | Persist config.json settings |
+| `getPluginConfigs()` | `get_plugin_configs` | `Promise<object>` | Per-plugin configuration map |
+| `savePluginConfigs(configs)`| `save_plugin_configs` | `Promise<boolean>` | Save per-plugin configurations |
+| `setPluginEnabled(id, enabled)`| Saves settings updating `disabledPlugins` list | `Promise<boolean>` | Toggle plugin enablement |
+| `importPluginFile(path)` | `exec_command` with `cat` to read content and saves via `write_external_file` | `Promise<{id, success, error}>` | Import external plugin JS |
+| `browsePluginFile()` | `select_file` (js) then imports via `importPluginFile` | `Promise<{id, success, error} \| null>` | Open file picker and import |
+| `openPluginsDir()` | `open_folder` with plugins path | `Promise<string>` | Open local plugins folder |
+| `getThemes()` | Frontend returns themes from `pluginManager` | `Promise<Theme[]>` | All registered themes |
+| `getActiveTheme()` | Reads activeTheme and themeSettings from `get_settings` | `Promise<{ activeTheme, themeSettings }>` | Active theme configurations |
+| `setActiveTheme(id)` | Saves settings updating `activeTheme` | `Promise<boolean>` | Switch active theme |
+| `saveThemeSettings(s)` | Saves settings updating `themeSettings` object | `Promise<boolean>` | Save glass intensity, mono font, etc. |
+| `importThemeFile(path)` | `exec_command` with `cat` to read content and saves via `write_external_file` | `Promise<{id, success, error}>` | Import external theme JS |
+| `browseThemeFile()` | `select_file` (js) then imports via `importThemeFile` | `Promise<{id, success, error} \| null>` | Open file picker and import |
+| `openThemesDir()` | `open_folder` with themes path | `Promise<string>` | Open local themes folder |
 
-### IPC Events (push from main → renderer)
+### IPC Events (Tauri Events → Frontend Listeners)
+
+Tauri events are pushed from Rust to the Webview:
 
 ```js
+// Listens to Rust emitted "download-log" stdout/stderr stream, 
+// parses progress using the corresponding plugin's parseProgress(line) in the webview,
+// and fires callback:
 window.api.onDownloadProgress(({ downloadId, percent, size, speed, eta, status }) => {})
+
+// Listens to Rust emitted "download-complete" event:
 window.api.onDownloadComplete(({ downloadId, status }) => {})
+
+// Listens to Rust emitted "download-error" event:
 window.api.onDownloadError(({ downloadId, status, error }) => {})
 ```
 
 ---
 
-## Config File (`<userData>/config.json`)
+## Config File (`<appDataDir>/config.json`)
 
 ```json
 {
@@ -248,10 +259,8 @@ window.api.onDownloadError(({ downloadId, status, error }) => {})
   "stageToTemp": true,
   "organize": "none",
   "disabledPlugins": [],
-  "externalPluginsDir": "<userData>/plugins",
   "activeTheme": "cyber-glass",
   "themeSettings": { "accentOverride": "", "glassIntensity": 75, "monoFont": false },
-  "externalThemesDir": "<userData>/themes",
   "plugins": {
     "lux":         { "luxPath": "lux", "luxMultiThread": false },
     "gallery-dl":  { "galleryDlPath": "gallery-dl", "galleryDlCookies": "" },
@@ -260,12 +269,7 @@ window.api.onDownloadError(({ downloadId, status, error }) => {})
 }
 ```
 
-**Download staging.** When `stageToTemp` is on (default), `start-download` runs the
-tool into `<finalFolder>/.xtractforge-tmp/<urlHash>/` and, on exit code 0, moves the
-files into the final folder applying `organize` (`none` | `type` | `source`), then
-removes the temp dir. The temp dir is keyed by URL hash and **left in place on failure**
-so re-downloading the same URL resumes (`options.resume` is passed to `buildDownloadArgs`
-— curl adds `-C -`; yt-dlp continues `.part` files by default).
+**Download staging.** When `stageToTemp` is on (default), the Rust backend launches the child download process in `<finalFolder>/.xtractforge-tmp/<urlHash>/`. Upon exit code 0, Rust moves the files into the final folder applying `organize` (`none` | `type` | `source`), cleans up the temp folder, and fires the `download-complete` event. On failure, the temp directory is **left in place** to allow the downloader to resume progress later.
 
 ---
 
@@ -273,12 +277,12 @@ so re-downloading the same URL resumes (`options.resume` is passed to `buildDown
 
 ```bash
 pnpm install      # Install deps
-pnpm dev          # Vite dev server + Electron (HMR)
+pnpm dev          # Vite dev server + Tauri dev app (HMR)
 pnpm test         # Run the Vitest suite once
 pnpm test:watch   # Re-run tests on every change
-pnpm release:patch # Bump version + push tag → release workflow builds installers (also: minor|major)
+pnpm release:patch # Bump version + push tag (CI release workflow compiles & builds)
 pnpm build        # Production React bundle → dist/
-pnpm package:mac  # Electron packager for macOS
+pnpm package:mac  # Tauri build for macOS
 pnpm package:win  # Windows
 pnpm package:linux
 pnpm package:all
@@ -295,16 +299,16 @@ pnpm package:all
 > green before any push or release; if it fails, fix it first.
 
 - `.github/workflows/ci.yml` — on PR / push to `main`: `pnpm install --frozen-lockfile --ignore-scripts`, then `pnpm test` + `pnpm build`.
-- `.github/workflows/release.yml` — on `push tag v*.*.*`: matrix (mac/win/linux) runs `electron-builder --<os> --publish always` (GitHub provider) → creates the Release and uploads dmg/exe/AppImage/deb.
+- `.github/workflows/release.yml` — on `push tag v*.*.*`: matrix (mac/win/linux) compiles and packages the binary using Tauri CLI (`tauri build`) and uploads dmg/exe/AppImage/deb to the GitHub Release.
 - Cut a release with `pnpm release:patch|minor|major` — bumps `package.json`, pushes the tag, and opens the generated GitHub Release (needs the `gh` CLI authenticated locally).
-- CI installs with `--ignore-scripts` (tests/Vite need no native postinstall; electron-builder fetches Electron itself). Local dev approves native builds via `pnpm-workspace.yaml` (`onlyBuiltDependencies`). Builds are currently **unsigned**.
+- CI installs with `--ignore-scripts` (tests/Vite need no native postinstall; Rust dependencies are compiled directly via Cargo).
 
 ---
 
 ## Adding a New Built-in Plugin
 
-1. Create `electron/plugins/<name>.js` following the plugin interface above
-2. `require` it in `electron/plugin-manager.js` and add it to `BUILTIN_PLUGINS` (before yt-dlp) or `BUILTIN_SEARCHERS`
+1. Create `src/plugins/<name>.ts` following the plugin interface above (defined as a TypeScript object)
+2. `import` it in `src/lib/plugin-loader.ts` and add it to `BUILTIN_PLUGINS` (before yt-dlp) or `BUILTIN_SEARCHERS`
 3. Add the plugin's `repoUrl` and `installHint` fields
 4. Test `checkDependency`, `canHandle`, `getInfo`, `buildDownloadArgs`, `parseProgress`
 
@@ -312,7 +316,7 @@ pnpm package:all
 
 ## Adding a New Built-in Theme
 
-1. Create `electron/themes/<name>.js` exporting `{ id, name, description, author, mode, swatches, variables }`
-2. `require` it in `electron/theme-manager.js` and add it to `BUILTIN_THEMES`
+1. Create `src/themes/<name>.ts` exporting an object with `{ id, name, description, author, mode, swatches, variables }`
+2. `import` it in `src/lib/plugin-loader.ts` and add it to `BUILTIN_THEMES`
 3. Define `variables` covering the color/bg/text/border/gradient/shadow vars from `src/index.css :root`
 4. Verify it renders by selecting it in the Themes tab

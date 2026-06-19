@@ -33,8 +33,8 @@ Report vulnerabilities privately via one of these channels:
 
 ### In scope
 
-- Vulnerabilities in XtractForge application code (`electron/`, `src/`)
-- IPC security issues (contextBridge, nodeIntegration, contextIsolation)
+- Vulnerabilities in XtractForge application code (`src-tauri/`, `src/`)
+- Tauri Command and IPC security issues
 - Plugin sandbox escapes or privilege escalation
 - Insecure default configuration that could harm users
 - Path traversal or command injection in download argument construction
@@ -47,6 +47,6 @@ Report vulnerabilities privately via one of these channels:
 
 ## Security Model
 
-XtractForge runs with Electron's `contextIsolation: true` and `nodeIntegration: false`. The renderer (React UI) has no direct access to Node.js APIs — all system access goes through the IPC bridge defined in `electron/preload.js`.
+XtractForge runs within Tauri's secure multi-process model. The WebView process (React UI) has no direct access to native APIs — all system access goes through the secure commands exposed by the Rust core process in `src-tauri/`.
 
-External plugins loaded from `<userData>/plugins/` run in the **main process** with full Node.js access. Only load plugin files from sources you trust.
+External plugins loaded from `<appDataDir>/plugins/` run inside the WebView process using a sandboxed CommonJS mock evaluator. They do not have direct access to native Node.js or Rust APIs; instead, they interact with the system via the `window.api` bridge (e.g. `execCommand` for binary invocations). Only load plugin files from sources you trust.

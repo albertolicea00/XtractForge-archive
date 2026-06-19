@@ -45,15 +45,15 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts the Vite dev server (port 5173) and opens Electron with HMR. Changes to `src/` hot-reload instantly. Changes to `electron/` require restarting.
+`pnpm dev` starts the Vite dev server and runs the Tauri development window. Changes to `src/` (frontend React/TS) hot-reload instantly, while changes to `src-tauri/` (Rust core) trigger cargo re-compilation.
 
 ### Build
 
 ```bash
-pnpm build           # React bundle → dist/
-pnpm package:mac     # macOS DMG
-pnpm package:win     # Windows NSIS
-pnpm package:linux   # Linux AppImage + deb
+pnpm build           # React bundle -> dist/ (frontend only)
+pnpm package:mac     # Tauri package (DMG)
+pnpm package:win     # Windows Installer (NSIS)
+pnpm package:linux   # Linux AppImage + deb package
 ```
 
 ### Tests
@@ -77,25 +77,33 @@ you change plugin routing, a helper, or a manager — keep regressions out.
 ## Project Structure
 
 ```
-electron/
-  main.js              Main process — IPC, plugin dispatch, settings
-  preload.js           contextBridge — secure API exposed to renderer
-  plugin-manager.js    Plugin registry and URL routing
-  plugins/             Built-in plugins (one file each)
+src-tauri/
+  Cargo.toml           Rust crate manifest
+  build.rs             Tauri build script
+  src/
+    main.rs            Core Tauri process entry point, registers commands and state
+    commands.rs        Tauri command implementations (file IO, system utilities, settings)
+    downloader.rs      Tauri async downloader command + state management
 src/
   App.jsx              Main React component (all UI tabs)
-  index.css            Dark theme CSS
   main.jsx             React entry point
-  index.html           HTML shell
+  lib/
+    tauri-bridge.ts    Exposes window.api IPC bridge to coordinate with Rust Tauri commands
+    plugin-loader.ts   Frontend plugin manager, sandbox executor (CommonJS mock)
+    format.js          Format helpers (sizes, speeds, durations)
+    theme.js           Theme state application
+    queue.js           Download queue management logic
+  plugins/             Built-in plugins (TypeScript modules)
+  themes/              Built-in themes (TypeScript modules)
 ```
 
 Key data flows:
 
-1. User pastes URL → renderer calls `window.api.getVideoInfo(url)`
-2. IPC → `main.js` → `plugin-manager.getDownloaderForUrl(url)` → correct plugin's `getInfo()`
-3. Result → renderer renders format picker
-4. User clicks Download → `window.api.startDownload(...)` → plugin's `buildDownloadArgs()` → `spawn(binary, args)`
-5. stdout lines → plugin's `parseProgress()` → IPC push → queue progress bar
+1. User pastes URL → renderer calls `window.api.getVideoInfo(url)`.
+2. Frontend routes request to `pluginManager.getDownloaderForUrl(url)` and runs the plugin's `getInfo()` method.
+3. Result → renderer renders format picker.
+4. User clicks Download → `window.api.startDownload(...)` → invokes Tauri Rust command `start_download` which spawns the child process and monitors output.
+5. Rust stdout lines → emitted as `download-log` event → parsed on the frontend using the plugin's `parseProgress()` → updates queue progress bar.
 
 ---
 
@@ -103,9 +111,9 @@ Key data flows:
 
 See [ADDONS.md](ADDONS.md) for the full plugin API. Quick start:
 
-1. Copy `electron/plugins/ytdlp.js` to `electron/plugins/my-tool.js`
+1. Copy `src/plugins/ytdlp.ts` to `src/plugins/my-tool.ts`
 2. Update all fields (`id`, `name`, `repoUrl`, `canHandle`, etc.)
-3. Register it in `electron/plugin-manager.js` — add to `BUILTIN_PLUGINS` (before yt-dlp)
+3. Register it in `src/lib/plugin-loader.ts` — import it and add to `BUILTIN_PLUGINS` (before yt-dlp)
 4. Test all methods manually
 5. Submit a PR
 
@@ -156,7 +164,7 @@ To share a community plugin without modifying core:
 
 ## Code Style
 
-- **JavaScript only** — no TypeScript (Electron main process is plain CJS; renderer is JSX via Vite)
+- **TypeScript & Rust** — The core backend is Rust (Tauri), and the frontend library files and built-in plugins/themes are written in TypeScript. External plugins remain as JavaScript/CommonJS modules.
 - **No comments explaining what the code does** — only add comments when the *why* is non-obvious
 - **No unused imports** — remove them
 - **Plugin files are self-contained** — no cross-plugin imports

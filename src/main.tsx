@@ -16,10 +16,22 @@ try {
   }
 } catch {}
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
+const initApp = async (): Promise<void> => {
+  if (!window.api) {
+    const { initTauriBridge } = await import('./lib/tauri-bridge');
+    await initTauriBridge();
+  }
+
+  const rootEl = document.getElementById('root');
+  if (rootEl) {
+    ReactDOM.createRoot(rootEl).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  }
+};
+
+initApp();

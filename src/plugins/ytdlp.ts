@@ -1,28 +1,25 @@
-const { spawn, execSync } = require('child_process');
-const path = require('path');
+const path = {
+  join: (...parts: string[]) => parts.filter(Boolean).join('/').replace(/\/+/g, '/')
+};
 
 const progressRegex = /\[download\]\s+([\d.]+)% of\s+(?:~\s*)?([\d.]+\w+) at\s+([\d.]+\w+\/s) ETA\s+([\d:]+)/;
 
-module.exports = {
+export default {
   id: 'yt-dlp',
   name: 'yt-dlp',
-  order: 3,   // display order in the Plugins tab (routing order is separate)
-  tag: 'Core engine',   // short category label shown on the plugin card
+  order: 3,
+  tag: 'Core engine',
   description: 'Download from YouTube, Vimeo, Twitter/X, TikTok, and 1000+ sites',
   type: 'downloader',
   icon: '🎥',
   repoUrl: 'https://github.com/yt-dlp/yt-dlp',
   installHint: 'pip install yt-dlp  OR  brew install yt-dlp',
-  // Per-OS install command. The renderer picks install[process.platform] and
-  // falls back to install.default, then installHint.
   install: {
     darwin: 'brew install yt-dlp ffmpeg',
     win32: 'winget install yt-dlp.yt-dlp',
     linux: 'pipx install yt-dlp',
     default: 'pip install yt-dlp',
   },
-  // Per-language overrides for this plugin's own text. English lives in the base
-  // fields above; add a language block to translate. Fields keyed by configSchema key.
   locales: {
     es: {
       tag: 'Motor principal',
@@ -38,60 +35,49 @@ module.exports = {
   },
 
   configSchema: [
-    { key: 'ytdlpPath', label: 'yt-dlp binary path', type: 'text', default: 'yt-dlp', placeholder: '/usr/local/bin/yt-dlp', help: "Path to the yt-dlp executable. Leave as 'yt-dlp' if it's on your PATH." },
+    { key: 'ytdlpPath', label: 'yt-dlp binary path', type: 'text', default: 'yt-dlp', placeholder: '/usr/local/bin/ytdlp', help: "Path to the yt-dlp executable. Leave as 'yt-dlp' if it's on your PATH." },
     { key: 'ffmpegPath', label: 'ffmpeg binary path', type: 'text', default: 'ffmpeg', placeholder: '/usr/local/bin/ffmpeg', help: 'Path to ffmpeg, used to merge separate video+audio streams and convert formats.' },
     { key: 'embedSubtitles', label: 'Embed Subtitles', type: 'toggle', default: false, help: 'Download available subtitles and embed them into the video file.' },
     { key: 'sponsorBlock', label: 'SponsorBlock', type: 'toggle', default: false, help: 'Skip sponsor/intro/outro segments on YouTube using the SponsorBlock database.' },
     { key: 'speedLimit', label: 'Speed Limit', type: 'text', default: '', placeholder: '50K, 10M (empty = unlimited)', help: 'Cap download speed, e.g. 50K or 10M. Leave empty for unlimited.' },
   ],
 
-  checkDependency(config) {
+  async checkDependency(config: any) {
     const bin = config.ytdlpPath || 'yt-dlp';
     try {
-      const out = execSync(`"${bin}" --version`, { encoding: 'utf8', timeout: 3000 });
-      return { available: true, version: out.trim() };
+      const res = await window.api.execCommand(bin, ['--version']);
+      return { available: res.success, version: res.stdout.trim() };
     } catch {
       return { available: false, version: '' };
     }
   },
 
-  // yt-dlp is the catch-all fallback — always returns true
   canHandle() {
     return true;
   },
 
-  getInfo(url, config) {
-    return new Promise((resolve, reject) => {
-      const bin = config.ytdlpPath || 'yt-dlp';
-      const args = ['--dump-single-json', '--flat-playlist', url];
-      let stdout = '';
-      let stderr = '';
-      const proc = spawn(bin, args);
-      proc.stdout.on('data', d => { stdout += d.toString(); });
-      proc.stderr.on('data', d => { stderr += d.toString(); });
-      proc.on('close', code => {
-        if (code === 0) {
-          try {
-            const data = JSON.parse(stdout);
-            const isPlaylist = data._type === 'playlist' || Array.isArray(data.entries);
-            const entryCount = Array.isArray(data.entries) ? data.entries.length : 0;
-            resolve({ success: true, data: { ...data, _plugin: 'yt-dlp', _isPlaylist: isPlaylist, _entryCount: entryCount } });
-          } catch (e) {
-            reject(new Error('Failed to parse yt-dlp output: ' + e.message));
-          }
-        } else {
-          reject(new Error(stderr.trim() || `yt-dlp exited with code ${code}`));
-        }
-      });
-      proc.on('error', err => reject(new Error(`Failed to run yt-dlp: ${err.message}`)));
-    });
+  async getInfo(url: string, config: any) {
+    const bin = config.ytdlpPath || 'yt-dlp';
+    const args = ['--dump-single-json', '--flat-playlist', url];
+    try {
+      const res = await window.api.execCommand(bin, args);
+      if (res.success) {
+        const data = JSON.parse(res.stdout);
+        const isPlaylist = data._type === 'playlist' || Array.isArray(data.entries);
+        const entryCount = Array.isArray(data.entries) ? data.entries.length : 0;
+        return { success: true, data: { ...data, _plugin: 'yt-dlp', _isPlaylist: isPlaylist, _entryCount: entryCount } };
+      } else {
+        throw new Error(res.stderr || `yt-dlp exited with error`);
+      }
+    } catch (e: any) {
+      throw new Error(`Failed to run yt-dlp: ${e.message}`);
+    }
   },
 
-  buildDownloadArgs(url, options, config) {
+  buildDownloadArgs(url: string, options: any, config: any) {
     const bin = config.ytdlpPath || 'yt-dlp';
     const args = [];
 
-    // Playlists nest into a folder, numbered by index; single videos stay flat
     const template = options.isPlaylist
       ? '%(playlist_title)s/%(playlist_index)s - %(title)s.%(ext)s'
       : '%(title)s.%(ext)s';
@@ -121,7 +107,7 @@ module.exports = {
     return { binary: bin, args };
   },
 
-  parseProgress(line) {
+  parseProgress(line: string) {
     const match = progressRegex.exec(line);
     if (!match) return null;
     return {

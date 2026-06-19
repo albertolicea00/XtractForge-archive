@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-const tm = require('../electron/theme-manager');
+import { pluginManager as tm } from '../src/lib/plugin-loader';
 
 describe('theme-manager', () => {
   it('registers built-in themes with valid shape', () => {

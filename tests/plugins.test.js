@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 
-const ytdlp = require('../electron/plugins/ytdlp');
-const galleryDl = require('../electron/plugins/gallery-dl');
-const spotdl = require('../electron/plugins/spotdl');
-const lux = require('../electron/plugins/lux');
-const curl = require('../electron/plugins/curl');
-const ffmpeg = require('../electron/plugins/ffmpeg');
+import ytdlp from '../src/plugins/ytdlp';
+import galleryDl from '../src/plugins/gallery-dl';
+import spotdl from '../src/plugins/spotdl';
+import lux from '../src/plugins/lux';
+import curl from '../src/plugins/curl';
+import ffmpeg from '../src/plugins/ffmpeg';
 
 const ALL = [ytdlp, galleryDl, spotdl, lux, curl, ffmpeg];
 

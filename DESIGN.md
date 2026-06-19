@@ -47,5 +47,5 @@ Theme management is handled through a dedicated **Theme Selector** menu, separat
 - `App.jsx` is a thin **shell**: owns state/handlers/effects, renders `Sidebar` + the active tab.
 - Each view is its own component under `src/components/` (`Sidebar`, `tabs/{Download,Queue,Plugins,Themes,Settings}Tab`).
 - Pure, framework-free logic lives in `src/lib/` (`format`, `theme`, `plugins`, `queue`) and is unit-tested.
-- Themes and plugins are single `.js` files (built-in under `electron/{themes,plugins}/`, community-importable).
+- Themes and plugins are TypeScript files for built-ins (under `src/{themes,plugins}/`), while external community plugins/themes are loaded dynamically as single `.js` files.
 - Tests: `tests/` (Vitest) — run `pnpm test` / `pnpm test:watch`. See [AGENTS.md](AGENTS.md) for the full map.
