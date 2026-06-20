@@ -134,6 +134,7 @@ Thumbs.db
 # AI stuff
 .claude/
 .agents/
+.continue/
 plan.md
 todo.md
 
