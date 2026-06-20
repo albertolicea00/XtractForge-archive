@@ -113,7 +113,7 @@ export const initTauriBridge = async (): Promise<void> => {
     openExternal: (url: string) => invoke('open_external', { url }),
 
     showContextMenu: () => {
-      // Browser native handles text selections, no-op for Electron wrapper
+      // Browser native handles text selections, no-op for Tauri wrapper
     },
 
     getVideoInfo: async (url: string, pluginId?: string) => {
