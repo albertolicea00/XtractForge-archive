@@ -1,4 +1,3 @@
-web application/stitch/projects/4501073658867560269/screens/63caa6b5ac4747649437236588429afb
 # XtractForge — High-Tech Media Extraction System
 
 ## North Star: "The Digital Forge"
