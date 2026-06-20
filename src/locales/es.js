@@ -12,6 +12,8 @@ export default {
   'download.extracting': 'Extrayendo…',
   'download.engine': 'Motor',
   'download.autoDetect': 'Auto-detectar (recomendado)',
+  'download.dropTitle': 'Suelta la URL para extraer',
+  'download.dropSubtitle': 'Soporta YouTube, Spotify, Bilibili y más',
 
   'plugins.title': 'Plugins',
   'plugins.subtitle': 'Gestiona y configura tus motores de extracción. Activa los que necesites o importa módulos de la comunidad.',

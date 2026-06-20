@@ -274,6 +274,87 @@ export default function App() {
     window.api.setZoomFactor?.(scale / 100);
   }, [themeSettings.fontScale]);
 
+  // ── Drag & Drop URL onto Window ───────────────────────────────────────────
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+  const analyzeRef = useRef(handleAnalyze);
+
+  useEffect(() => {
+    analyzeRef.current = handleAnalyze;
+  }, [handleAnalyze]);
+
+  useEffect(() => {
+    const handleDragEnter = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const types = e.dataTransfer.types;
+      const hasUrl = types.includes('text/uri-list') || types.includes('text/plain');
+      if (!hasUrl) return;
+
+      dragCounter.current++;
+      if (dragCounter.current === 1) {
+        setIsDragging(true);
+      }
+    };
+
+    const handleDragLeave = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      dragCounter.current--;
+      if (dragCounter.current <= 0) {
+        dragCounter.current = 0;
+        setIsDragging(false);
+      }
+    };
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      dragCounter.current = 0;
+      setIsDragging(false);
+
+      let draggedUrl = '';
+      const uriList = e.dataTransfer.getData('text/uri-list');
+      if (uriList) {
+        draggedUrl = uriList.split('\n')[0].trim();
+      }
+
+      if (!draggedUrl) {
+        const plainText = e.dataTransfer.getData('text/plain');
+        if (plainText && (plainText.startsWith('http://') || plainText.startsWith('https://'))) {
+          draggedUrl = plainText.trim();
+        }
+      }
+
+      if (draggedUrl) {
+        setUrl(draggedUrl);
+        setActiveTab('download');
+        analyzeRef.current(null, draggedUrl);
+      }
+    };
+
+    window.addEventListener('dragenter', handleDragEnter);
+    window.addEventListener('dragleave', handleDragLeave);
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
+
+    return () => {
+      window.removeEventListener('dragenter', handleDragEnter);
+      window.removeEventListener('dragleave', handleDragLeave);
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, []);
+
   // ── Download tab ──────────────────────────────────────────────────────────
 
   const handleAnalyze = async (e, overrideUrl) => {
@@ -508,6 +589,16 @@ export default function App() {
       <div className="titlebar-drag"></div>
       <div className="bg-glow-1"></div>
       <div className="bg-glow-2"></div>
+
+      {isDragging && (
+        <div className="drag-drop-overlay">
+          <div className="drag-drop-content">
+            <div className="drag-drop-icon">🔗</div>
+            <h2>{t('download.dropTitle')}</h2>
+            <p>{t('download.dropSubtitle')}</p>
+          </div>
+        </div>
+      )}
 
       <Sidebar
         t={t}
