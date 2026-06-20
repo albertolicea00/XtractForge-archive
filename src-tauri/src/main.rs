@@ -18,27 +18,25 @@ struct TrayState {
 fn update_tray_state(
   app: AppHandle,
   state: tauri::State<'_, TrayState>,
-  progress: Option<f64>,
-  active_count: usize,
+  status_text: String,
+  tooltip_text: Option<String>,
+  title_text: Option<String>,
 ) {
-  let text = if active_count > 0 {
-    let pct = progress.unwrap_or(0.0);
-    format!("Extracting: {:.0}% ({} active)", pct, active_count)
-  } else {
-    "Idle".to_string()
-  };
-
   // Update menu item text
   if let Ok(guard) = state.status_item.lock() {
     if let Some(ref item) = *guard {
-      let _ = item.set_text(&text);
+      let _ = item.set_text(&status_text);
     }
   }
 
-  // Update tray tooltip dynamically
+  // Update tray tooltip and title dynamically
   if let Some(tray) = app.tray_by_id("main") {
-    let tooltip = format!("XtractForge - {}", text);
-    let _ = tray.set_tooltip(Some(tooltip));
+    if let Some(tooltip) = tooltip_text {
+      let _ = tray.set_tooltip(Some(tooltip));
+    }
+    if let Some(title) = title_text {
+      let _ = tray.set_title(Some(title));
+    }
   }
 }
 

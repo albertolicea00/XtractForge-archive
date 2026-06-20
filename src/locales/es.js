@@ -28,4 +28,6 @@ export default {
 
   'queue.title': 'Cola de descargas',
   'queue.subtitle': 'Descargas activas e historial.',
+  'queue.statusExtracting': 'Extrayendo',
+  'queue.statusIdle': 'Inactivo',
 };
