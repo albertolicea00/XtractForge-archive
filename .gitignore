@@ -122,6 +122,7 @@ Thumbs.db
 /src-tauri/binaries/*
 !/src-tauri/binaries/.gitkeep
 /src-tauri/gen/
+/src-tauri/Cargo.lock
 
 # Environment files
 .env
