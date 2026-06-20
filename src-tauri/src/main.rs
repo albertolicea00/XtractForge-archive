@@ -4,8 +4,8 @@ mod commands;
 mod downloader;
 
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager};
-use tauri::menu::{Menu, MenuItemBuilder};
+use tauri::{AppHandle, Manager, Emitter};
+use tauri::menu::{Menu, MenuItemBuilder, MenuBuilder, SubmenuBuilder, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use downloader::DownloadState;
 
@@ -37,6 +37,33 @@ fn update_tray_state(
     if let Some(title) = title_text {
       let _ = tray.set_title(Some(title));
     }
+  }
+}
+
+#[tauri::command]
+fn open_settings_window(app: AppHandle) {
+  if let Some(window) = app.get_webview_window("settings") {
+    let _ = window.show();
+    let _ = window.set_focus();
+  } else {
+    let _ = tauri::WebviewWindowBuilder::new(
+      &app,
+      "settings",
+      tauri::WebviewUrl::App("index.html".into())
+    )
+    .title("Preferences")
+    .inner_size(680.0, 580.0)
+    .resizable(false)
+    .decorations(true)
+    .build();
+  }
+}
+
+#[tauri::command]
+fn focus_main_window(app: AppHandle) {
+  if let Some(window) = app.get_webview_window("main") {
+    let _ = window.show();
+    let _ = window.set_focus();
   }
 }
 
@@ -125,7 +152,101 @@ fn main() {
         *guard = Some(status_item);
       }
 
+      // 4. Create native application menu
+      let preferences_item = MenuItemBuilder::new("Preferences...")
+        .id("preferences")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
+
+      let check_updates_item = MenuItemBuilder::new("Check for Updates...")
+        .id("check_updates")
+        .build(app)?;
+
+      let menu = if cfg!(target_os = "macos") {
+        let app_menu = SubmenuBuilder::new(app, "XtractForge")
+          .item(&PredefinedMenuItem::about(app, None, None)?)
+          .separator()
+          .item(&preferences_item)
+          .separator()
+          .item(&PredefinedMenuItem::services(app, None)?)
+          .separator()
+          .item(&PredefinedMenuItem::hide(app, None)?)
+          .item(&PredefinedMenuItem::hide_others(app, None)?)
+          .item(&PredefinedMenuItem::show_all(app, None)?)
+          .separator()
+          .item(&PredefinedMenuItem::quit(app, None)?)
+          .build()?;
+
+        let file_menu = SubmenuBuilder::new(app, "File")
+          .item(&PredefinedMenuItem::close_window(app, None)?)
+          .build()?;
+
+        let edit_menu = SubmenuBuilder::new(app, "Edit")
+          .item(&PredefinedMenuItem::undo(app, None)?)
+          .item(&PredefinedMenuItem::redo(app, None)?)
+          .separator()
+          .item(&PredefinedMenuItem::cut(app, None)?)
+          .item(&PredefinedMenuItem::copy(app, None)?)
+          .item(&PredefinedMenuItem::paste(app, None)?)
+          .separator()
+          .item(&PredefinedMenuItem::select_all(app, None)?)
+          .build()?;
+
+        let help_menu = SubmenuBuilder::new(app, "Help")
+          .item(&check_updates_item)
+          .build()?;
+
+        MenuBuilder::new(app)
+          .item(&app_menu)
+          .item(&file_menu)
+          .item(&edit_menu)
+          .item(&help_menu)
+          .build()?
+      } else {
+        let file_menu = SubmenuBuilder::new(app, "File")
+          .item(&preferences_item)
+          .separator()
+          .item(&PredefinedMenuItem::quit(app, None)?)
+          .build()?;
+
+        let edit_menu = SubmenuBuilder::new(app, "Edit")
+          .item(&PredefinedMenuItem::undo(app, None)?)
+          .item(&PredefinedMenuItem::redo(app, None)?)
+          .separator()
+          .item(&PredefinedMenuItem::cut(app, None)?)
+          .item(&PredefinedMenuItem::copy(app, None)?)
+          .item(&PredefinedMenuItem::paste(app, None)?)
+          .separator()
+          .item(&PredefinedMenuItem::select_all(app, None)?)
+          .build()?;
+
+        let help_menu = SubmenuBuilder::new(app, "Help")
+          .item(&check_updates_item)
+          .separator()
+          .item(&PredefinedMenuItem::about(app, None, None)?)
+          .build()?;
+
+        MenuBuilder::new(app)
+          .item(&file_menu)
+          .item(&edit_menu)
+          .item(&help_menu)
+          .build()?
+      };
+
+      app.set_menu(menu)?;
+
       Ok(())
+    })
+    .on_menu_event(|app_handle, event| {
+      match event.id().as_ref() {
+        "preferences" => {
+          open_settings_window(app_handle.clone());
+        }
+        "check_updates" => {
+          let _ = app_handle.emit("check-for-updates-menu", ());
+        }
+        _ => {}
+      }
     })
     .on_window_event(|window, event| match event {
       tauri::WindowEvent::CloseRequested { api, .. } => {
@@ -166,7 +287,9 @@ fn main() {
       downloader::cancel_download,
       downloader::pause_download,
       downloader::resume_download,
-      update_tray_state
+      update_tray_state,
+      open_settings_window,
+      focus_main_window
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
