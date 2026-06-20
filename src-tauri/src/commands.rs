@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::fs;
 use tauri::{AppHandle, Manager};
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 use serde_json::Value;
 
 #[derive(Serialize)]
