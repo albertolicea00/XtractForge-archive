@@ -47,10 +47,13 @@ describe('canHandle routing', () => {
     expect(curl.canHandle('https://x.com/a/b.mp4')).toBe(true);
     expect(curl.canHandle('https://x.com/s.m3u8')).toBe(false);
   });
-  it('ffmpeg matches streams', () => {
+  it('ffmpeg matches streams and local media files', () => {
     expect(ffmpeg.canHandle('https://x.com/s.m3u8')).toBe(true);
     expect(ffmpeg.canHandle('rtmp://host/app/stream')).toBe(true);
     expect(ffmpeg.canHandle('https://x.com/a.mp4')).toBe(false);
+    expect(ffmpeg.canHandle('/Users/test/video.mp4')).toBe(true);
+    expect(ffmpeg.canHandle('C:\\path\\audio.mp3')).toBe(true);
+    expect(ffmpeg.canHandle('/Users/test/text.txt')).toBe(false);
   });
 });
 
@@ -88,6 +91,40 @@ describe('buildDownloadArgs', () => {
     expect(args).toContain('copy');
   });
 
+  it('ffmpeg handles local file conversion arguments', () => {
+    const { binary, args } = ffmpeg.buildDownloadArgs('/Users/test/video.mp4', {
+      downloadFolder: '/tmp',
+      pluginOptions: {
+        action: 'convert',
+        container: 'mkv',
+        videoCodec: 'h264',
+        audioCodec: 'aac'
+      }
+    }, {});
+    expect(binary).toBe('ffmpeg');
+    expect(args).toContain('-i');
+    expect(args).toContain('/Users/test/video.mp4');
+    expect(args).toContain('-vcodec');
+    expect(args).toContain('libx264');
+    expect(args).toContain('-acodec');
+    expect(args).toContain('aac');
+    expect(args.some(a => a.endsWith('video_converted.mkv'))).toBe(true);
+  });
+
+  it('ffmpeg handles local file audio extraction arguments', () => {
+    const { args } = ffmpeg.buildDownloadArgs('/Users/test/video.mp4', {
+      downloadFolder: '/tmp',
+      pluginOptions: {
+        action: 'extract_audio',
+        container: 'mp3',
+        audioCodec: 'mp3'
+      }
+    }, {});
+    expect(args).toContain('-vn');
+    expect(args).toContain('libmp3lame');
+    expect(args.some(a => a.endsWith('video_converted.mp3'))).toBe(true);
+  });
+
   it('curl uses a custom filename from pluginOptions and resumes with -C -', () => {
     const { args } = curl.buildDownloadArgs('https://x.com/a/video.mp4', { downloadFolder: '/tmp', resume: true, pluginOptions: { filename: 'clip.mp4' } }, {});
     expect(args.join(' ')).toContain('/tmp/clip.mp4');
@@ -104,10 +141,20 @@ describe('buildDownloadArgs', () => {
 });
 
 describe('plugin getInfo metadata', () => {
-  it('curl exposes a filename download option', () => {
-    return curl.getInfo('https://x.com/a/video.mp4', {}).then(r => {
-      expect(r.data._downloadOptions[0].key).toBe('filename');
-      expect(r.data._downloadOptions[0].default).toBe('video.mp4');
+    it('curl exposes a filename download option', () => {
+      return curl.getInfo('https://x.com/a/video.mp4', {}).then(r => {
+        expect(r.data._downloadOptions[0].key).toBe('filename');
+        expect(r.data._downloadOptions[0].default).toBe('video.mp4');
+      });
+    });
+
+    it('ffmpeg exposes conversion options for local files', () => {
+      return ffmpeg.getInfo('/Users/test/movie.mp4', {}).then(r => {
+        expect(r.data._downloadOptions.some(o => o.key === 'action')).toBe(true);
+        expect(r.data._downloadOptions.some(o => o.key === 'container')).toBe(true);
+        expect(r.data._downloadOptions.some(o => o.key === 'videoCodec')).toBe(true);
+        expect(r.data.uploader).toBe('Local File');
+        expect(r.data.title).toBe('movie');
+      });
     });
   });
-});
