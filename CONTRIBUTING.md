@@ -38,14 +38,29 @@ Thanks for your interest in contributing. This guide covers everything you need 
 
 ### Install and run
 
-```bash
-git clone https://github.com/albertolicea00/XtractForge.git
-cd XtractForge
-pnpm install
-pnpm dev
-```
+1. Install the Tauri CLI globally (requires Rust/Cargo):
+   ```bash
+   cargo install tauri-cli
+   ```
 
-`pnpm dev` starts the Vite dev server and runs the Tauri development window. Changes to `src/` (frontend React/TS) hot-reload instantly, while changes to `src-tauri/` (Rust core) trigger cargo re-compilation.
+2. Clone the repository and install dependencies:
+   ```bash
+   git clone https://github.com/albertolicea00/XtractForge.git
+   cd XtractForge
+   pnpm install
+   ```
+
+3. Start the application in development mode:
+   - Using the global Tauri CLI:
+     ```bash
+     tauri dev
+     ```
+   - Or using the package script:
+     ```bash
+     npm run tauri  # or: pnpm tauri
+     ```
+
+`tauri dev` starts the Vite dev server and runs the Tauri development window. Changes to `src/` (frontend React/TS) hot-reload instantly, while changes to `src-tauri/` (Rust core) trigger cargo re-compilation.
 
 ### Build
 

@@ -277,7 +277,9 @@ window.api.onDownloadError(({ downloadId, status, error }) => {})
 
 ```bash
 pnpm install      # Install deps
-pnpm dev          # Vite dev server + Tauri dev app (HMR)
+npm run tauri     # Runs Tauri dev app (launches dev server + native window)
+tauri dev         # Runs Tauri dev app if global tauri-cli is installed
+npm run dev       # Starts the frontend dev server (Vite) only
 pnpm test         # Run the Vitest suite once
 pnpm test:watch   # Re-run tests on every change
 pnpm release:patch # Bump version + push tag (CI release workflow compiles & builds)

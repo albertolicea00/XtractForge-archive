@@ -186,6 +186,34 @@ tests/                 Vitest suite (lib, plugins, managers)
 
 ---
 
+## 💻 Development
+
+To run XtractForge locally in development mode:
+
+1. **Install Tauri CLI globally** (requires Rust/Cargo):
+   ```bash
+   cargo install tauri-cli
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+3. **Start the application**:
+   - Using the global Tauri CLI:
+     ```bash
+     tauri dev
+     ```
+   - Or using the package script:
+     ```bash
+     npm run tauri  # runs "tauri dev" under the hood
+     ```
+
+This starts the Vite development server and launches the native Tauri desktop window with HMR enabled.
+
+---
+
 ## 🧪 Tests
 
 ```bash
