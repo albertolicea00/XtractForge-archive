@@ -212,7 +212,6 @@ export default function App() {
     const unsub4 = window.api.onDownloadLog((data) => {
       setLogs(prev => {
         const existing = prev[data.downloadId] || '';
-        // Keep only the last ~8000 chars per download to bound memory
         const combined = (existing + data.chunk).slice(-8000);
         return { ...prev, [data.downloadId]: combined };
       });
@@ -229,7 +228,31 @@ export default function App() {
       });
     }
 
-    return () => { unsub1(); unsub2(); unsub3(); unsub4(); if (unsub5) unsub5(); };
+    const unsub6 = window.api.onSettingsChanged((updatedSettings) => {
+      setSettings(prev => ({ ...prev, ...updatedSettings }));
+      if (updatedSettings.language) {
+        setLanguage(updatedSettings.language);
+        try { localStorage.setItem('xf-lang', updatedSettings.language); } catch {}
+      }
+    });
+
+    const unsub7 = window.api.onNavigateMain?.((data) => {
+      setActiveTab(data.tab);
+      if (data.pluginId !== undefined) {
+        setSelectedPlugin(data.pluginId);
+      }
+      window.api.focusMainWindow?.();
+    });
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+      if (unsub5) unsub5();
+      unsub6();
+      if (unsub7) unsub7();
+    };
   }, [refreshPlugins, loadThemes]);
 
   // Update system tray status when download queue changes
@@ -865,26 +888,6 @@ export default function App() {
             handleThemeSetting={handleThemeSetting}
             settings={settings}
             updateSetting={updateSetting}
-          />
-        )}
-
-        {activeTab === 'settings' && (
-          <SettingsTab
-            t={t}
-            savedFlash={savedFlash}
-            settings={settings}
-            handleSelectFolder={handleSelectFolder}
-            updateSetting={updateSetting}
-            language={language}
-            handleSetLanguage={handleSetLanguage}
-            appVersion={appVersion}
-            autoCheckUpdates={autoCheckUpdates}
-            handleToggleAutoUpdates={handleToggleAutoUpdates}
-            handleCheckUpdates={handleCheckUpdates}
-            checkingUpdate={checkingUpdate}
-            updateInfo={updateInfo}
-            setActiveTab={setActiveTab}
-            setSelectedPlugin={setSelectedPlugin}
           />
         )}
       </main>

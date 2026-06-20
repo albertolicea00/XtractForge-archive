@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import SettingsApp from './SettingsApp';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
@@ -24,10 +25,16 @@ const initApp = async (): Promise<void> => {
 
   const rootEl = document.getElementById('root');
   if (rootEl) {
+    let label = 'main';
+    try {
+      const { getCurrentWindow } = await import('@tauri-apps/api/window');
+      label = getCurrentWindow().label;
+    } catch {}
+
     ReactDOM.createRoot(rootEl).render(
       <React.StrictMode>
         <ErrorBoundary>
-          <App />
+          {label === 'settings' ? <SettingsApp /> : <App />}
         </ErrorBoundary>
       </React.StrictMode>
     );

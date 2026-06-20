@@ -24,7 +24,14 @@ export default function Sidebar({ t, appVersion, updateInfo, activeTab, setActiv
           <li
             key={id}
             className={`nav-item ${activeTab === id ? 'active' : ''}`}
-            onClick={() => { setActiveTab(id); if (id === 'plugins') setSelectedPlugin(null); }}
+            onClick={() => {
+              if (id === 'settings') {
+                window.api.openSettingsWindow();
+              } else {
+                setActiveTab(id);
+                if (id === 'plugins') setSelectedPlugin(null);
+              }
+            }}
           >
             {icon}
             <span>{label}</span>

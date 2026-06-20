@@ -5,7 +5,7 @@ import { LANGUAGES } from '../../i18n';
 export default function SettingsTab({
   t, savedFlash, settings, handleSelectFolder, updateSetting, language, handleSetLanguage,
   appVersion, autoCheckUpdates, handleToggleAutoUpdates, handleCheckUpdates, checkingUpdate, updateInfo,
-  setActiveTab, setSelectedPlugin,
+  setActiveTab, setSelectedPlugin, standalone = false,
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -200,7 +200,14 @@ export default function SettingsTab({
             Open the <strong>Plugins</strong> tab, pick a plugin, and click <strong>Settings</strong>.
           </p>
         </div>
-        <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => { setActiveTab('plugins'); setSelectedPlugin(null); }}>
+        <button className="btn btn-secondary" style={{ fontSize: '12px', padding: '8px 14px', flexShrink: 0 }} onClick={() => {
+          if (standalone) {
+            window.api.emitNavigateMain({ tab: 'plugins', pluginId: null });
+          } else {
+            setActiveTab('plugins');
+            setSelectedPlugin(null);
+          }
+        }}>
           <Puzzle size={14} /> Open Plugins
         </button>
       </div>

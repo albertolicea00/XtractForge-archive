@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { appDataDir, downloadDir, join } from '@tauri-apps/api/path';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { pluginManager } from './plugin-loader';
@@ -378,6 +378,42 @@ export const initTauriBridge = async (): Promise<void> => {
 
     onOsThemeChanged: (callback: any) => {
       return () => {};
+    },
+
+    openSettingsWindow: () => invoke('open_settings_window'),
+
+    focusMainWindow: () => invoke('focus_main_window'),
+
+    emitSettingsChanged: (settings: any) => {
+      emit('settings-changed', settings);
+    },
+
+    onSettingsChanged: (callback: any) => {
+      let unsub: any;
+      listen<any>('settings-changed', (event) => {
+        callback(event.payload);
+      }).then(fn => { unsub = fn; });
+      return () => { if (unsub) unsub(); };
+    },
+
+    emitNavigateMain: (data: { tab: string; pluginId?: string | null }) => {
+      emit('navigate-main', data);
+    },
+
+    onNavigateMain: (callback: any) => {
+      let unsub: any;
+      listen<any>('navigate-main', (event) => {
+        callback(event.payload);
+      }).then(fn => { unsub = fn; });
+      return () => { if (unsub) unsub(); };
+    },
+
+    onCheckForUpdatesMenu: (callback: any) => {
+      let unsub: any;
+      listen<any>('check-for-updates-menu', () => {
+        callback();
+      }).then(fn => { unsub = fn; });
+      return () => { if (unsub) unsub(); };
     },
   };
 };
