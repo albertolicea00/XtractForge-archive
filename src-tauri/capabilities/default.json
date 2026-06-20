@@ -8,8 +8,6 @@
   "permissions": [
     "core:default",
     "core:event:allow-listen",
-    "core:event:allow-emit",
-    "core:path:allow-app-data-dir",
-    "core:path:allow-download-dir"
+    "core:event:allow-emit"
   ]
 }

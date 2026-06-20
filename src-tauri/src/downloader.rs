@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Stdio;
 use tokio::process::{Command, Child};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tauri::{AppHandle, Emitter, Manager};
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
 
 #[derive(Default)]
 pub struct DownloadState {
@@ -135,7 +135,6 @@ pub async fn start_download(
   // Set process group on Unix so we can kill child processes cleanly if needed
   #[cfg(unix)]
   {
-    use std::os::unix::process::CommandExt;
     cmd.process_group(0);
   }
 
@@ -152,10 +151,10 @@ pub async fn start_download(
 
   let app_clone = app.clone();
   let download_id_clone = download_id.clone();
-  let state_clone = app.state::<DownloadState>();
 
   // Process monitor task
   tokio::spawn(async move {
+    let state_clone = app_clone.state::<DownloadState>();
     let mut stdout_reader = BufReader::new(stdout).lines();
     let mut stderr_reader = BufReader::new(stderr).lines();
 
@@ -185,7 +184,7 @@ pub async fn start_download(
     let _ = tokio::join!(stdout_handle, stderr_handle);
 
     // Wait for the child process to complete
-    let mut child = {
+    let child = {
       let mut procs = state_clone.active_processes.lock().unwrap();
       procs.remove(&download_id_clone)
     };
