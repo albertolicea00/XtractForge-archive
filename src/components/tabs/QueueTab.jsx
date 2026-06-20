@@ -79,11 +79,14 @@ export default function QueueTab({
                 )}
               </div>
               <div className="queue-item-actions">
-                {(item.status === 'downloading' || item.status === 'paused') && (
+                {(item.status === 'downloading' || item.status === 'paused' || item.status === 'queued') && (
                   <>
-                    {item.status === 'downloading'
-                      ? <button onClick={() => handlePauseDownload(item.id)} className="btn btn-secondary" style={{ padding: '8px' }} title="Pause"><Pause size={16} /></button>
-                      : <button onClick={() => handleResumeDownload(item.id)} className="btn btn-secondary" style={{ padding: '8px' }} title="Resume"><Play size={16} /></button>}
+                    {item.status === 'downloading' && (
+                      <button onClick={() => handlePauseDownload(item.id)} className="btn btn-secondary" style={{ padding: '8px' }} title="Pause"><Pause size={16} /></button>
+                    )}
+                    {item.status === 'paused' && (
+                      <button onClick={() => handleResumeDownload(item.id)} className="btn btn-secondary" style={{ padding: '8px' }} title="Resume"><Play size={16} /></button>
+                    )}
                     <button onClick={() => handleCancelDownload(item.id)} className="btn btn-danger" style={{ padding: '8px' }} title="Cancel"><XCircle size={16} /></button>
                   </>
                 )}

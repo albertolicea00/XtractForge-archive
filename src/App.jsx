@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { makeT } from './i18n';
-import { getThumbnailUrl } from './lib/format';
+import { getThumbnailUrl, formatBytes, parseSpeedToBps } from './lib/format';
 import { applyTheme } from './lib/theme';
 import Sidebar from './components/Sidebar';
 import DownloadTab from './components/tabs/DownloadTab';
@@ -61,6 +61,10 @@ export default function App() {
     osDarkMode: false,
     osAccentColor: null,
     runInBackground: false,
+    trayFormatMode: 'default',
+    trayCustomTemplate: '{status}: {percent}% ({active} active)',
+    showTrayTitle: true,
+    maxConcurrentDownloads: '2',
   });
 
   // Plugin-specific configs: { [pluginId]: { ...keys } }
@@ -122,6 +126,10 @@ export default function App() {
           osDarkMode: !!saved.osDarkMode,
           osAccentColor: saved.osAccentColor || null,
           runInBackground: !!saved.runInBackground,
+          trayFormatMode: saved.trayFormatMode || 'default',
+          trayCustomTemplate: saved.trayCustomTemplate || '{status}: {percent}% ({active} active)',
+          showTrayTitle: saved.showTrayTitle !== false,
+          maxConcurrentDownloads: saved.maxConcurrentDownloads || '2',
         }));
         setDisabledPlugins(saved.disabledPlugins || []);
         if (typeof saved.autoCheckUpdates === 'boolean') setAutoCheckUpdates(saved.autoCheckUpdates);
@@ -226,16 +234,60 @@ export default function App() {
 
   // Update system tray status when download queue changes
   useEffect(() => {
+    if (!window.api.updateTrayState) return;
+
     const activeDownloads = queue.filter(item => item.status === 'downloading');
     const activeCount = activeDownloads.length;
-    const progress = activeCount > 0
-      ? activeDownloads.reduce((acc, item) => acc + (item.percent || 0), 0) / activeCount
-      : 0;
 
-    if (window.api.updateTrayState) {
-      window.api.updateTrayState(progress, activeCount);
+    if (activeCount === 0) {
+      const statusText = t('queue.statusIdle', 'Idle');
+      const tooltipText = `XtractForge - ${statusText}`;
+      window.api.updateTrayState(statusText, tooltipText, '');
+      return;
     }
-  }, [queue]);
+
+    const progress = activeDownloads.reduce((acc, item) => acc + (item.percent || 0), 0) / activeCount;
+    const totalBps = activeDownloads.reduce((sum, item) => sum + parseSpeedToBps(item.speed), 0);
+    const speedStr = totalBps > 0 ? formatBytes(totalBps) + '/s' : '—';
+    const etaStr = activeDownloads.find(item => item.eta && item.eta !== '--:--')?.eta || '—';
+
+    const status = t('queue.statusExtracting', 'Extracting');
+    const percentStr = progress.toFixed(0);
+
+    const formatMode = settings.trayFormatMode || 'default';
+    let template = '{status}: {percent}% ({active} active)';
+    switch (formatMode) {
+      case 'simple':
+        template = '{percent}% ({active})';
+        break;
+      case 'detailed':
+        template = '{status}: {percent}% | {speed} | {eta}';
+        break;
+      case 'minimal':
+        template = '{active} active';
+        break;
+      case 'custom':
+        template = settings.trayCustomTemplate || '{status}: {percent}% ({active} active)';
+        break;
+      default:
+        break;
+    }
+
+    const replacePlaceholders = (tmpl) => {
+      return tmpl
+        .replace(/{status}/g, status)
+        .replace(/{percent}/g, percentStr)
+        .replace(/{active}/g, activeCount.toString())
+        .replace(/{speed}/g, speedStr)
+        .replace(/{eta}/g, etaStr);
+    };
+
+    const statusText = replacePlaceholders(template);
+    const tooltipText = `XtractForge - ${replacePlaceholders('{status}: {percent}% ({active} active)')}`;
+    const titleText = settings.showTrayTitle !== false ? `${percentStr}%` : '';
+
+    window.api.updateTrayState(statusText, tooltipText, titleText);
+  }, [queue, settings.trayFormatMode, settings.trayCustomTemplate, settings.showTrayTitle, language]);
 
   // Refresh free disk space when viewing the queue
   useEffect(() => {
@@ -370,6 +422,110 @@ export default function App() {
     };
   }, []);
 
+  const handleDroppedFiles = useCallback(async (paths) => {
+    if (!paths || paths.length === 0) return;
+
+    if (paths.length === 1) {
+      setUrl(paths[0]);
+      setActiveTab('download');
+      analyzeRef.current(null, paths[0]);
+    } else {
+      setActiveTab('queue');
+      for (const filePath of paths) {
+        try {
+          const response = await window.api.getVideoInfo(filePath);
+          if (response.success && response.data) {
+            const videoInfo = response.data;
+            const detectedPlugin = response.pluginId || 'ffmpeg';
+
+            const dlOpts = {};
+            (videoInfo._downloadOptions || []).forEach(f => { dlOpts[f.key] = f.default; });
+
+            const downloadId = Date.now().toString() + Math.random().toString(36).slice(2, 6);
+            const title = videoInfo.title || 'Conversion';
+
+            const downloadOptions = {
+              pluginId: detectedPlugin,
+              downloadFolder: settings.downloadFolder,
+              pluginOptions: dlOpts,
+            };
+
+            const newItem = {
+              id: downloadId,
+              title,
+              thumbnail: '',
+              url: filePath,
+              pluginId: detectedPlugin,
+              percent: 0,
+              speed: '0 B/s',
+              eta: '--:--',
+              size: 'Local file',
+              status: 'queued',
+              errorMsg: '',
+              folder: settings.downloadFolder,
+              options: downloadOptions,
+            };
+
+            setQueue(prev => [newItem, ...prev]);
+          }
+        } catch (err) {
+          console.error(`Failed to auto-queue dropped file ${filePath}:`, err);
+        }
+      }
+    }
+  }, [settings.downloadFolder]);
+
+  // Tauri native file drop handler
+  useEffect(() => {
+    let unsub;
+    const registerTauriDragDrop = async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const appWindow = getCurrentWindow();
+        unsub = await appWindow.onDragDropEvent((event) => {
+          if (event.payload.type === 'drop') {
+            const paths = event.payload.paths;
+            if (paths && paths.length > 0) {
+              handleDroppedFiles(paths);
+            }
+            setIsDragging(false);
+          } else if (event.payload.type === 'enter') {
+            setIsDragging(true);
+          } else if (event.payload.type === 'leave') {
+            setIsDragging(false);
+          }
+        });
+      } catch (err) {
+        console.warn('Tauri Drag Drop listener registration skipped:', err);
+      }
+    };
+    registerTauriDragDrop();
+    return () => { if (unsub) unsub(); };
+  }, [handleDroppedFiles]);
+
+  // Queue Concurrency Scheduler
+  useEffect(() => {
+    const activeDownloads = queue.filter(item => item.status === 'downloading');
+    const activeCount = activeDownloads.length;
+    const maxConcurrent = settings.maxConcurrentDownloads || '2';
+
+    if (maxConcurrent === 'unlimited' || activeCount < Number(maxConcurrent)) {
+      const queuedItems = [...queue].reverse().filter(item => item.status === 'queued');
+      if (queuedItems.length > 0) {
+        const nextItem = queuedItems[0];
+
+        setQueue(prev => prev.map(q => q.id === nextItem.id ? { ...q, status: 'downloading' } : q));
+
+        window.api.startDownload(nextItem.id, nextItem.url, nextItem.options)
+          .catch(err => {
+            setQueue(prev => prev.map(q =>
+              q.id === nextItem.id ? { ...q, status: 'error', errorMsg: err.message || 'Failed to start' } : q
+            ));
+          });
+      }
+    }
+  }, [queue, settings.maxConcurrentDownloads]);
+
   // ── Download tab ──────────────────────────────────────────────────────────
 
   const handleAnalyze = async (e, overrideUrl) => {
@@ -456,24 +612,20 @@ export default function App() {
       audioOnly: isAudio,
       isPlaylist: !!videoInfo._isPlaylist,
       entryCount: videoInfo._entryCount || 0,
+      options: downloadOptions,
     };
 
     setQueue(prev => [newItem, ...prev]);
     setActiveTab('queue');
-
-    try {
-      await window.api.startDownload(downloadId, url.trim(), downloadOptions);
-    } catch (err) {
-      setQueue(prev => prev.map(item =>
-        item.id === downloadId ? { ...item, status: 'error', errorMsg: err.message } : item
-      ));
-    }
   };
 
   const handleCancelDownload = async (id) => {
-    await window.api.cancelDownload(id);
-    setQueue(prev => prev.map(item =>
-      item.id === id ? { ...item, status: 'error', errorMsg: 'Cancelled by user' } : item
+    const item = queue.find(q => q.id === id);
+    if (item && item.status !== 'queued') {
+      await window.api.cancelDownload(id);
+    }
+    setQueue(prev => prev.map(q =>
+      q.id === id ? { ...q, status: 'error', errorMsg: 'Cancelled by user' } : q
     ));
   };
 
