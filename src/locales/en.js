@@ -28,4 +28,6 @@ export default {
 
   'queue.title': 'Download Queue',
   'queue.subtitle': 'Active downloads and history.',
+  'queue.statusExtracting': 'Extracting',
+  'queue.statusIdle': 'Idle',
 };
