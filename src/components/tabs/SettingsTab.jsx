@@ -52,10 +52,12 @@ export default function SettingsTab({
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('settings.languageDesc')}</span>
             </div>
 
-            <div className="toggle-row" style={{ marginTop: '8px' }}>
+            <h3 style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '16px' }}>OS Integration & Queue</h3>
+
+            <div className="toggle-row" style={{ marginTop: 0 }}>
               <div className="toggle-details">
                 <span className="toggle-title">Run in background</span>
-                <span className="toggle-desc">Hides the window on close to keep conversions running in the background. Exit completely via system tray icon.</span>
+                <span className="toggle-desc">Hides the window on close to keep downloads/conversions running in the background.</span>
               </div>
               <label className="switch">
                 <input type="checkbox" checked={!!settings.runInBackground} onChange={(e) => updateSetting({ runInBackground: e.target.checked })} />
@@ -63,7 +65,48 @@ export default function SettingsTab({
               </label>
             </div>
 
+            <div className="toggle-row">
+              <div className="toggle-details">
+                <span className="toggle-title">Show macOS menu bar percentage</span>
+                <span className="toggle-desc">Displays the active percentage next to the menu bar tray icon.</span>
+              </div>
+              <label className="switch">
+                <input type="checkbox" checked={settings.showTrayTitle !== false} onChange={(e) => updateSetting({ showTrayTitle: e.target.checked })} />
+                <span className="slider"></span>
+              </label>
+            </div>
 
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label>Tray Progress Format</label>
+              <select value={settings.trayFormatMode || 'default'} onChange={(e) => updateSetting({ trayFormatMode: e.target.value })} style={{ padding: '12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
+                <option value="default">Default: Status: X% (Y active)</option>
+                <option value="simple">Simple: X% (Y)</option>
+                <option value="detailed">Detailed: Status: X% | Speed | ETA</option>
+                <option value="minimal">Minimal: Y active</option>
+                <option value="custom">Custom Template...</option>
+              </select>
+            </div>
+
+            {settings.trayFormatMode === 'custom' && (
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label>Custom Tray Template</label>
+                <input type="text" placeholder="{status}: {percent}% ({active} active)" value={settings.trayCustomTemplate || ''} onChange={(e) => updateSetting({ trayCustomTemplate: e.target.value })} style={{ padding: '12px', background: 'var(--bg-input)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', color: 'var(--text-primary)', fontFamily: 'var(--font-sans)', fontSize: '13px', outline: 'none' }} />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Placeholders: {'{status}'}, {'{percent}'}, {'{active}'}, {'{speed}'}, {'{eta}'}</span>
+              </div>
+            )}
+
+            <div className="input-group" style={{ marginBottom: 0 }}>
+              <label>Maximum Concurrent Downloads</label>
+              <select value={settings.maxConcurrentDownloads || '2'} onChange={(e) => updateSetting({ maxConcurrentDownloads: e.target.value })} style={{ padding: '12px', background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', outline: 'none', fontFamily: 'var(--font-sans)', fontSize: '13px' }}>
+                <option value="1">1 at a time (Sequential)</option>
+                <option value="2">2 at a time</option>
+                <option value="3">3 at a time</option>
+                <option value="4">4 at a time</option>
+                <option value="5">5 at a time</option>
+                <option value="unlimited">Unlimited (Parallel)</option>
+              </select>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Limits the number of simultaneous active extractions.</span>
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
