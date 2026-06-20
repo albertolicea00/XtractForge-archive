@@ -52,6 +52,17 @@ export default function SettingsTab({
               <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('settings.languageDesc')}</span>
             </div>
 
+            <div className="toggle-row" style={{ marginTop: '8px' }}>
+              <div className="toggle-details">
+                <span className="toggle-title">Run in background</span>
+                <span className="toggle-desc">Hides the window on close to keep conversions running in the background. Exit completely via system tray icon.</span>
+              </div>
+              <label className="switch">
+                <input type="checkbox" checked={!!settings.runInBackground} onChange={(e) => updateSetting({ runInBackground: e.target.checked })} />
+                <span className="slider"></span>
+              </label>
+            </div>
+
 
           </div>
 

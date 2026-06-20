@@ -60,6 +60,7 @@ export default function App() {
     useSystemAccentColor: true,
     osDarkMode: false,
     osAccentColor: null,
+    runInBackground: false,
   });
 
   // Plugin-specific configs: { [pluginId]: { ...keys } }
@@ -120,6 +121,7 @@ export default function App() {
           useSystemAccentColor: saved.useSystemAccentColor !== false,
           osDarkMode: !!saved.osDarkMode,
           osAccentColor: saved.osAccentColor || null,
+          runInBackground: !!saved.runInBackground,
         }));
         setDisabledPlugins(saved.disabledPlugins || []);
         if (typeof saved.autoCheckUpdates === 'boolean') setAutoCheckUpdates(saved.autoCheckUpdates);
@@ -221,6 +223,19 @@ export default function App() {
 
     return () => { unsub1(); unsub2(); unsub3(); unsub4(); if (unsub5) unsub5(); };
   }, [refreshPlugins, loadThemes]);
+
+  // Update system tray status when download queue changes
+  useEffect(() => {
+    const activeDownloads = queue.filter(item => item.status === 'downloading');
+    const activeCount = activeDownloads.length;
+    const progress = activeCount > 0
+      ? activeDownloads.reduce((acc, item) => acc + (item.percent || 0), 0) / activeCount
+      : 0;
+
+    if (window.api.updateTrayState) {
+      window.api.updateTrayState(progress, activeCount);
+    }
+  }, [queue]);
 
   // Refresh free disk space when viewing the queue
   useEffect(() => {

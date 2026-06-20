@@ -193,6 +193,10 @@ export const initTauriBridge = async (): Promise<void> => {
       return invoke('get_disk_free', { path: folder });
     },
 
+    updateTrayState: (progress: number, activeCount: number) => {
+      return invoke('update_tray_state', { progress, activeCount });
+    },
+
     getSettings: async () => {
       const res = await invoke<any>('get_settings');
       return {
@@ -212,6 +216,7 @@ export const initTauriBridge = async (): Promise<void> => {
         useSystemAccentColor: true,
         osDarkMode: false,
         osAccentColor: null,
+        runInBackground: false,
         ...res
       };
     },
