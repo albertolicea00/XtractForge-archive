@@ -4,15 +4,15 @@
   "packageManager": "pnpm@11.5.2",
   "description": "Cross-platform desktop media downloader with a plugin architecture (yt-dlp, gallery-dl, spotDL, Lux, ffmpeg, curl).",
   "scripts": {
-    "tauri": "tauri",
-    "dev": "tauri dev",
+    "tauri": "tauri dev",
+    "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "package:mac": "tauri build",
-    "package:win": "tauri build",
-    "package:linux": "tauri build",
-    "package:all": "tauri build"
+    "package:mac": "export PATH=\"$HOME/.cargo/bin:$PATH\" && tauri build",
+    "package:win": "export PATH=\"$HOME/.cargo/bin:$PATH\" && tauri build",
+    "package:linux": "export PATH=\"$HOME/.cargo/bin:$PATH\" && tauri build",
+    "package:all": "export PATH=\"$HOME/.cargo/bin:$PATH\" && tauri build"
   },
   "keywords": [
     "yt-dlp",

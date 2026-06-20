@@ -3,8 +3,8 @@
   "version": "1.2.0",
   "identifier": "com.xtractforge.app",
   "build": {
-    "beforeDevCommand": "",
-    "beforeBuildCommand": "",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "pnpm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },
