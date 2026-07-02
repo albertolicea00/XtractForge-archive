@@ -10,6 +10,29 @@ declare global {
   }
 }
 
+// True when running inside the Tauri webview; false in a plain browser tab,
+// where the event/invoke IPC internals are not injected.
+const isTauri = (): boolean => '__TAURI_INTERNALS__' in window;
+
+const safeListen = async <T>(
+  event: string,
+  handler: (event: { payload: T }) => void
+): Promise<() => void> => {
+  if (!isTauri()) {
+    console.warn(`[tauri-bridge] listen('${event}') skipped: not running inside Tauri`);
+    return () => {};
+  }
+  return listen<T>(event, handler);
+};
+
+const safeEmit = (event: string, payload?: any): void => {
+  if (!isTauri()) {
+    console.warn(`[tauri-bridge] emit('${event}') skipped: not running inside Tauri`);
+    return;
+  }
+  emit(event, payload);
+};
+
 // Helper to determine OS platform
 const getPlatform = (): string => {
   const ua = navigator.userAgent.toLowerCase();
@@ -331,7 +354,7 @@ export const initTauriBridge = async (): Promise<void> => {
 
     onDownloadComplete: (callback: any) => {
       let unsub: any;
-      listen<any>('download-complete', (event) => {
+      safeListen<any>('download-complete', (event) => {
         const { downloadId } = event.payload;
         activeDownloadsPlugins.delete(downloadId);
         callback(event.payload);
@@ -341,7 +364,7 @@ export const initTauriBridge = async (): Promise<void> => {
 
     onDownloadError: (callback: any) => {
       let unsub: any;
-      listen<any>('download-error', (event) => {
+      safeListen<any>('download-error', (event) => {
         const { downloadId } = event.payload;
         activeDownloadsPlugins.delete(downloadId);
         callback(event.payload);
@@ -351,7 +374,7 @@ export const initTauriBridge = async (): Promise<void> => {
 
     onDownloadLog: (callback: any) => {
       let unsub: any;
-      listen<any>('download-log', (event) => {
+      safeListen<any>('download-log', (event) => {
         const { downloadId, chunk } = event.payload;
         callback(event.payload);
 
@@ -385,24 +408,24 @@ export const initTauriBridge = async (): Promise<void> => {
     focusMainWindow: () => invoke('focus_main_window'),
 
     emitSettingsChanged: (settings: any) => {
-      emit('settings-changed', settings);
+      safeEmit('settings-changed', settings);
     },
 
     onSettingsChanged: (callback: any) => {
       let unsub: any;
-      listen<any>('settings-changed', (event) => {
+      safeListen<any>('settings-changed', (event) => {
         callback(event.payload);
       }).then(fn => { unsub = fn; });
       return () => { if (unsub) unsub(); };
     },
 
     emitNavigateMain: (data: { tab: string; pluginId?: string | null }) => {
-      emit('navigate-main', data);
+      safeEmit('navigate-main', data);
     },
 
     onNavigateMain: (callback: any) => {
       let unsub: any;
-      listen<any>('navigate-main', (event) => {
+      safeListen<any>('navigate-main', (event) => {
         callback(event.payload);
       }).then(fn => { unsub = fn; });
       return () => { if (unsub) unsub(); };
@@ -410,7 +433,7 @@ export const initTauriBridge = async (): Promise<void> => {
 
     onCheckForUpdatesMenu: (callback: any) => {
       let unsub: any;
-      listen<any>('check-for-updates-menu', () => {
+      safeListen<any>('check-for-updates-menu', () => {
         callback();
       }).then(fn => { unsub = fn; });
       return () => { if (unsub) unsub(); };

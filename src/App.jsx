@@ -367,11 +367,11 @@ export default function App() {
   // ── Drag & Drop URL onto Window ───────────────────────────────────────────
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
-  const analyzeRef = useRef(handleAnalyze);
+  const analyzeRef = useRef(null);
 
   useEffect(() => {
     analyzeRef.current = handleAnalyze;
-  }, [handleAnalyze]);
+  });
 
   useEffect(() => {
     const handleDragEnter = (e) => {
