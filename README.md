@@ -1,7 +1,11 @@
-> [!IMPORTANT]  
+> [!WARNING]  
 > **DEPRECATED** — This Tauri/Web version is no longer maintained.  
-Native platform-specific replacements are available:  
-[**XtractForge4Mac**](https://github.com/albertolicea00/XtractForge4Mac) · [**XtractForge4Windows**](https://github.com/albertolicea00/XtractForge4Windows)
+> Native platform-specific replacements are available:  
+> [**XtractForge4Mac**](https://github.com/albertolicea00/XtractForge4Mac) · [**XtractForge4Windows**](https://github.com/albertolicea00/XtractForge4Windows)
+
+
+> [!NOTE] 
+> The [latest GitHub release (v1.2.0)](https://github.com/albertolicea00/XtractForge/releases/latest) contains binaries from the **old Electron version**, not this Tauri codebase. This Tauri rewrite was never compiled into a release — to build it you must compile from source (see [Development](#-development)).
 
 # XtractForge
 
