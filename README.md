@@ -1,3 +1,8 @@
+> [!IMPORTANT]  
+> **DEPRECATED** — This Tauri/Web version is no longer maintained.  
+Native platform-specific replacements are available:  
+[**XtractForge4Mac**](https://github.com/albertolicea00/XtractForge4Mac) · [**XtractForge4Windows**](https://github.com/albertolicea00/XtractForge4Windows)
+
 # XtractForge
 
 <div align="center">
